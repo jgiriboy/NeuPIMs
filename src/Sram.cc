@@ -3,9 +3,9 @@
 #include "Sram.h"
 #define NUM_PORTS 3
 
-Sram::Sram(SimulationConfig config, const cycle_type &core_cycle, bool accum)
+Sram::Sram(SimulationConfig config, const cycle_type &core_cycle, bool accum, uint32_t core_id)
     : _core_cycle(core_cycle) {
-    _size = accum ? config.accum_spad_size KB : config.spad_size KB;
+    _size = accum ? config.core_config[core_id].accum_spad_size KB : config.core_config[core_id].spad_size KB;
     _data_width = config.dram_req_size;
     int precision = config.precision;
     _current_size[0] = 0;
