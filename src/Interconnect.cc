@@ -45,7 +45,7 @@ SimpleInterconnect::SimpleInterconnect(SimulationConfig config) : _latency(confi
     spdlog::info("Initialize SimpleInterconnect");
     _cycles = 0;
     _config = config;
-    _n_nodes = config.num_cores * config.dram_channels + config.dram_channels;
+    _n_nodes = config.num_cores * config.dram_channels + config.dram_channels; // (num_cores + 1) * dram_channels
     _dram_offset = config.num_cores * config.dram_channels;
     _in_buffers.resize(_n_nodes);
     _out_buffers.resize(config.num_cores * config.dram_channels);
@@ -59,7 +59,7 @@ SimpleInterconnect::SimpleInterconnect(SimulationConfig config) : _latency(confi
         _busy_node[node] = false;
     }
     // TODO: make it configurable
-    _mem_cycle_interval = 250;
+    _mem_cycle_interval = 250; // Fixed to 250 core cycles
     _stats.resize(config.dram_channels);
     for (size_t i = 0; i < config.dram_channels; ++i) {
         _stats[i].push_back(MemoryIOStat(0, i, _mem_cycle_interval));

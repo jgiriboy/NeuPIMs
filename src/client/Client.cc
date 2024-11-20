@@ -42,9 +42,11 @@ void Client::cycle() {
     uint32_t idle_cycles = _cycles - _last_request_cycle;
     // return; // FIXME: comment
     // FIXME: change while to if
+
+    //_touch : 더이상 request로 처리할 데이터를 가지고 있지 않을 때 true로 변경
     while (!_touch) {
         // todo: send request to scheduler
-        uint32_t rid = generate_rid();
+        uint32_t rid = generate_rid(); // increasing number
 
         // TODO: from benchmark dataset
         // uint32_t input_size = rand_input_size();  // 10;
@@ -58,9 +60,9 @@ void Client::cycle() {
             break;
             // exit(-1);
         }
-        uint32_t input_size = input_output_size.first;
+        uint32_t input_size = input_output_size.first; // csv 파일 첫번째 열
         uint32_t output_size = 1;  // input_output_size.second;  // 1;
-        uint32_t channel = input_output_size.second;
+        uint32_t channel = input_output_size.second; // csv 파일 두번째 열
         std::shared_ptr<InferRequest> request =
             std::make_shared<InferRequest>(InferRequest{.id = rid,
                                                         .arrival_cycle = _cycles,

@@ -84,6 +84,7 @@ Scheduler::Scheduler(SimulationConfig config, const cycle_type* core_cycle)
     _gemv_latency = 184;
 }
 
+// assign member variable _model with the input model
 void Scheduler::launch(Ptr<Model> model) {
     _model = model;
     spdlog::info("MODEL {} Launched in Scheduler", model->get_name());
@@ -167,6 +168,9 @@ int Scheduler::allocate_pim_tile(uint32_t seq_len) {
     return ch;
 }
 
+// At this point, _request_queue, which has been filled with requests from the client, needs to be allocated.
+// The allocated requests are stored in _active_request_queues.
+// I'm not aware of 'latency' stuffs yet.
 void Scheduler::allocate_requests() {
     uint32_t batch_size = 0;
 
@@ -186,7 +190,7 @@ void Scheduler::allocate_requests() {
 
         if (!request->is_initiated) {
             int ch = request->channel;
-            assert(ch < _dram_channels);
+            assert(ch < _dram_channels); // 채널이 dram channel이었구나..
             spdlog::info("request#{} seq_len:{} channel:{}", request->id, request->input_size,
                          request->channel);
             // allocate_pim_tile(request->input_size);
@@ -241,9 +245,12 @@ void Scheduler::allocate_requests() {
     // exit(-1);
 }
 
+//[TODO] This function has a deeep logic. Need to check it later.
 void Scheduler::make_program() {
     std::shared_ptr<BatchedRequest> sub_batch_on_sa;
     std::shared_ptr<BatchedRequest> sub_batch_on_pim;
+
+    // [TODO] This part should be modified to support triple sub-batch.
     if (static_cast<int>(_stage) % 2 == 0) {
         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
@@ -264,6 +271,7 @@ void Scheduler::make_program() {
     refresh_status2();
 }
 
+// [TODO] Check this code.
 int Scheduler::estimate_mha_latency(Ptr<InferRequest> request) {
     // calculate MHA latency with sequence length
     int latency = 0;
@@ -284,6 +292,7 @@ int Scheduler::estimate_mha_latency(Ptr<InferRequest> request) {
     return latency;
 }
 
+// Literally sub-batch grouping function.
 void Scheduler::group_sub_batches() {
     if (!_config.sub_batch_mode) {
         //>>>
@@ -372,7 +381,8 @@ void Scheduler::init_batches() {
 }
 
 void Scheduler::cycle() {
-    bool step_next_stage = _model_program1 == nullptr && _model_program2 == nullptr;
+    // true if 'both program(SA and PIM) are done' or 'not yet initialized' 
+    bool step_next_stage = _model_program1 == nullptr && _model_program2 == nullptr; 
 
     if (step_next_stage && _stage == _init_stage && !_request_queue.empty()) {
         init_batches();
@@ -386,7 +396,7 @@ void Scheduler::cycle() {
         bool lets_make_program2 = _model_program2 == nullptr && _breq2.size() > 0;
 
         if (lets_make_program1 && lets_make_program2) {
-            if (_stage == Stage::Finish) {
+            if (_stage == Stage::Finish) { // enum class Stage { A, B, C, D, E, F, Finish };
                 cleanup_sub_batch(_breq1);
                 cleanup_sub_batch(_breq2);
                 _breq1.clear();
