@@ -245,7 +245,7 @@ typedef struct {
 
     // request demand
     uint32_t input_size;   // input sequence length
-    uint32_t output_size;  // # tokens to generate
+    uint32_t output_size;  // # tokens to generate : 1
 
     // request status
     bool is_initiated;   // whether initialization phase is done

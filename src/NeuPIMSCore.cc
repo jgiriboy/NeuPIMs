@@ -38,9 +38,9 @@ NeuPIMSCore::NeuPIMSCore(uint32_t id, SimulationConfig config)
     _running_layer = -1;
     _current_spad = 0;
     _current_acc_spad = 0;
-    _memory_request_queues1.resize(_config.dram_channels);
-    _memory_request_queues2.resize(_config.dram_channels);
-    _vector_pipelines.resize(_config.vector_core_count);
+    _memory_request_queues1.resize(_config.dram_channels); // length: 32
+    _memory_request_queues2.resize(_config.dram_channels); // length: 32
+    _vector_pipelines.resize(_config.vector_core_count); // 8
 }
 bool NeuPIMSCore::can_issue_pim() { return _pim_tiles.empty(); }
 // if next_tile.accum == true

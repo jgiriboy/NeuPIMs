@@ -13,9 +13,9 @@ namespace fs = std::filesystem;
 
 Simulator::Simulator(SimulationConfig config) : _config(config), _core_cycles(0) {
     // Create dram object
-    _core_period = 1.0 / ((double)config.core_freq);
-    _icnt_period = 1.0 / ((double)config.icnt_freq);
-    _dram_period = 1.0 / ((double)config.dram_freq);
+    _core_period = 1.0 / ((double)config.core_freq); // core_freq = 1000
+    _icnt_period = 1.0 / ((double)config.icnt_freq); // icnt_freq = 2000
+    _dram_period = 1.0 / ((double)config.dram_freq); // dram_freq = 1000
     _core_time = 0.0;
     _dram_time = 0.0;
     _icnt_time = 0.0;
@@ -38,7 +38,7 @@ Simulator::Simulator(SimulationConfig config) : _config(config), _core_cycles(0)
     // Create core objects
     _cores.resize(config.num_cores);
     _n_cores = config.num_cores;
-    _n_memories = config.dram_channels;
+    _n_memories = config.dram_channels; // 32
     for (int core_index = 0; core_index < _n_cores; core_index++) {
         spdlog::info("initializing NeuPIM SystolicWS cores.");
         _cores[core_index] = std::make_unique<NeuPIMSystolicWS>(core_index, _config);
@@ -66,6 +66,7 @@ void Simulator::run(std::string model_name) {
     cycle();
 }
 
+// [TODO] May need to be checked.
 void Simulator::update_stage_stat() {
     Stage done_stage = _scheduler->get_prev_stage();
     _dram->log(done_stage);
@@ -110,6 +111,7 @@ void Simulator::log_stage_stat() {
     ofile.close();
 }
 
+// It is not a one-cycle function. It is a function that runs the simulation until the end.
 void Simulator::cycle() {
     OpStat op_stat;
     ModelStat model_stat;
@@ -120,18 +122,19 @@ void Simulator::cycle() {
         set_cycle_mask();
         // Core Cycle
         if (_cycle_mask & CORE_MASK) {
+            // Client가 가지고 있는 모든 _waiting_que에 있는 request를 Scheduler의 _request_que에 넣어준다.
             while (_client->has_request()) {  // FIXME: change while to if
                 std::shared_ptr<InferRequest> infer_request = _client->pop_request();
                 _scheduler->add_request(infer_request);
             }
-            _client->cycle();
+            _client->cycle(); // get inferRequest to waiting_queue as much as possible
 
-            while (_scheduler->has_completed_request()) {
+            while (_scheduler->has_completed_request()) { // Every completed request is being processed.
                 std::shared_ptr<InferRequest> response = _scheduler->pop_completed_request();
                 _client->receive_response(response);
             }
 
-            if (_scheduler->has_stage_changed()) {
+            if (_scheduler->has_stage_changed()) { 
                 _scheduler->reset_has_stage_changed_status();
                 // _icnt->log(_scheduler->get_prev_stage());
                 update_stage_stat();
@@ -139,7 +142,7 @@ void Simulator::cycle() {
             _scheduler->cycle();
 
             for (int core_id = 0; core_id < _n_cores; core_id++) {
-                auto finished_tile = _cores[core_id]->pop_finished_tile();
+                auto finished_tile = _cores[core_id]->pop_finished_tile(); //NeuPIMSCore::pop_finished_tile()
                 if (finished_tile == nullptr) {
                 } else if (finished_tile->status == Tile::Status::FINISH) {
                     _scheduler->finish_tile(core_id, *finished_tile);
@@ -170,7 +173,7 @@ void Simulator::cycle() {
                     }
                 }
                 // <<< todo: support 2 sub-batch
-                _cores[core_id]->cycle();
+                _cores[core_id]->cycle(); // NeuPIMSystolicWS::cycle()
             }
             _core_cycles++;
         }
@@ -179,11 +182,12 @@ void Simulator::cycle() {
         if (_cycle_mask & DRAM_MASK) {
             _dram->cycle();
         }
+
         // Interconnect cycle
         if (_cycle_mask & ICNT_MASK) {
-            for (int core_id = 0; core_id < _n_cores; core_id++) {
-                for (uint32_t channel_index = 0; channel_index < _n_memories; ++channel_index) {
-                    auto core_ind = core_id * _n_cores + channel_index;
+            for (int core_id = 0; core_id < _n_cores; core_id++) { // for every cores
+                for (uint32_t channel_index = 0; channel_index < _n_memories; ++channel_index) { // for every memory channels (static value 32)
+                    auto core_ind = core_id * _n_cores + channel_index; // [TODO] unique index for each core and memory channel? Maybe this can be a bug
                     // core -> ICNT (sub-batch #1)
                     if (_cores[core_id]->has_memory_request1(channel_index)) {
                         MemoryAccess *front = _cores[core_id]->top_memory_request1(channel_index);
@@ -243,6 +247,7 @@ void Simulator::cycle() {
             _icnt->cycle();
         }
     }
+    
     spdlog::info("Simulation Finished");
     /* Print simulation stats */
     for (int core_id = 0; core_id < _n_cores; core_id++) {
@@ -256,8 +261,10 @@ void Simulator::cycle() {
     log_stage_stat();
 }
 
+// assign member variable _model with the input model
 void Simulator::launch_model(Ptr<Model> model) { _model = model; }
 
+// return true if any of the components are running
 bool Simulator::running() {
     bool running = false;
 
@@ -267,7 +274,7 @@ bool Simulator::running() {
     running = running || _icnt->running();
     running = running || _dram->running();
     running = running || _scheduler->running();
-    running = running || _client->running();
+    running = running || _client->running(); // This rules running() function.
     // if (!_client->running() && _cores[0]->running()) {
     //     // for debug
     //     spdlog::info("core[1] running: {}", _cores[0]->running());
@@ -281,6 +288,8 @@ bool Simulator::running() {
     return running;
 }
 
+// Set the cycle mask to the minimum time of the three components
+// As each component has its own frequency, the cycle mask is set to run every components on their own timing.
 void Simulator::set_cycle_mask() {
     _cycle_mask = 0x0;
     double minimum_time = MIN3(_core_time, _dram_time, _icnt_time);

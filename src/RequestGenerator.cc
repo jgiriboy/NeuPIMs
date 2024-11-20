@@ -3,8 +3,8 @@
 namespace RequestGenerator {
 uint32_t answer_index;
 uint32_t row_index;
-std::vector<std::string> columns;
-std::vector<std::vector<uint32_t>> table;
+std::vector<std::string> columns; // have column names
+std::vector<std::vector<uint32_t>> table; // This table has the same format compared to the csv file
 
 void init(std::string path, uint32_t _answer_index) {
     row_index = 0;
@@ -20,12 +20,14 @@ int get_total_req_cnt() { return table.size(); }
 
 bool has_data() { return row_index < table.size(); }
 
+// answer_index is always 1.
 std::pair<uint32_t, uint32_t> get_qa_length() {
-    ast(has_data());
+    ast(has_data()); /// assert
     auto row = table[row_index++];
     return std::make_pair(row[0], row[answer_index]);
 }
 
+// the path points to a csv file which has seq_len,ch_idx.
 void parse(std::string path) {
     std::ifstream input_file(path);
     if (!input_file.is_open()) {
