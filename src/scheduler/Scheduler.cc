@@ -244,6 +244,9 @@ void Scheduler::allocate_requests() {
 void Scheduler::make_program() {
     std::shared_ptr<BatchedRequest> sub_batch_on_sa;
     std::shared_ptr<BatchedRequest> sub_batch_on_pim;
+    /*
+        [TODO]
+    */
     if (static_cast<int>(_stage) % 2 == 0) {
         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
@@ -306,6 +309,11 @@ void Scheduler::group_sub_batches() {
         assert(req_queue.size() == latency_queue.size());
 
         if (_partition_alg_simple) {
+            
+            /* [TODO]
+                This code snippet is Algorithm 3 in the paper.
+                We need to fix this part to group triple-batches.
+            */
             size_t sb1_size = req_queue.size() / 2;
 
             if (req_queue.size() % 2 != 0) {
@@ -318,6 +326,9 @@ void Scheduler::group_sub_batches() {
             }
 
             for (int i = 0; i < req_queue.size(); i++) {
+                /*
+                    [TODO]
+                */
                 Ptr<InferRequest> request = req_queue[i];
                 if (i < sb1_size)
                     _breq1.push_back(request);
@@ -387,6 +398,9 @@ void Scheduler::cycle() {
 
         if (lets_make_program1 && lets_make_program2) {
             if (_stage == Stage::Finish) {
+                /*
+                    [TODO]
+                */
                 cleanup_sub_batch(_breq1);
                 cleanup_sub_batch(_breq2);
                 _breq1.clear();
@@ -404,6 +418,9 @@ void Scheduler::cycle() {
         bool exist_request = _breq2.size() > 0 || _breq1.size() > 0;
         if (both_program_none && exist_request) {
             if (_stage == Stage::Finish) {
+                /*
+                    [TODO]
+                */
                 cleanup_sub_batch(_breq1);
                 cleanup_sub_batch(_breq2);
                 _breq1.clear();
