@@ -20,8 +20,8 @@ CONFIG_FILE=${LOG_DIR}/config.log
 echo "log directory: $LOG_DIR"
 
 
-
-./build/bin/Simulator \
+#gdb --args \
+    ./build/bin/Simulator \
     --config $config \
     --mem_config $mem_config \
     --cli_config $cli_config \
