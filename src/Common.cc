@@ -141,12 +141,6 @@ void PrintColor(Color color, std::string str) {
 
 SimulationConfig Config::global_config;
 
-const static std::map<std::string, CoreType> available_core_types = {{"systolic_os", CoreType::SYSTOLIC_OS},
-                                                                     {"systolic_ws", CoreType::SYSTOLIC_WS}};
-
-const static std::map<std::string, IcntType> available_icnt_types = {{"simple", IcntType::SIMPLE},
-                                                                     {"booksim2", IcntType::BOOKSIM2}};
-
 SimulationConfig initialize_config(json config) {
     SimulationConfig parsed_config;
     /* Core configs */
@@ -158,8 +152,10 @@ SimulationConfig initialize_config(json config) {
         std::string core_id_str = "core_" + std::to_string(core_id);
         auto core_config = config["core_config"][core_id_str];
 
-        if (available_core_types.count((std::string)core_config["core_type"]) > 0) {
-            parsed_config.core_config[core_id].core_type = core_config["core_type"];
+        if ((std::string)core_config["core_type"] == "systolic_os") {
+            parsed_config.core_config[core_id].core_type = CoreType::SYSTOLIC_OS;
+        } else if ((std::string)core_config["core_type"] == "systolic_ws") {
+            parsed_config.core_config[core_id].core_type = CoreType::SYSTOLIC_WS;
         } else {
             throw std::runtime_error( 
                 fmt::format("Not implemented core type {} ", (std::string)core_config["core_type"]));
@@ -193,8 +189,10 @@ SimulationConfig initialize_config(json config) {
     parsed_config.operation_log_output_path = config["operation_log_output_path"];
 
     /* Icnt config */
-    if (available_icnt_types.count((std::string)config["icnt_type"]) > 0) {
-        parsed_config.icnt_type = config["icnt_type"];
+    if ((std::string)config["icnt_type"] == "simple") {
+        parsed_config.icnt_type = IcntType::SIMPLE;
+    } else if ((std::string)config["icnt_type"] == "booksim2") {
+        parsed_config.icnt_type = IcntType::BOOKSIM2;
     } else {
         throw std::runtime_error(fmt::format("Not implemented icnt type {} ", (std::string)config["icnt_type"]));
     }
