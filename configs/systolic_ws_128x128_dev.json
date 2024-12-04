@@ -1,28 +1,65 @@
 {
-    "num_cores": 1,
-    "core_type": "systolic_ws",
+    "num_cores": 2,
     "core_freq": 1000,
-    "core_width": 128,
-    "core_height": 128,
 
-    "__sram_size": 7168,
-    "sram_size": 134218,
-    "spad_size": 1024,
-    "accum_spad_size": 1024,
-    "sram_width": 128,
+    "core_config": {
+        "core_0": {
+            "core_type": "systolic_ws",
+            "core_width": 128,
+            "core_height": 128,
 
-    "process_bit": 32,
-    "vector_core_count": 8,
-    "vector_core_width": 128,
-    "systolic_array_count": 8,
-    "add_latency": 1,
-    "mul_latency": 1,
-    "exp_latency": 1,
-    "gelu_latency": 1,
-    "add_tree_latency": 1,
-    "scalar_sqrt_latency": 1,
-    "scalar_add_latency": 1,
-    "scalar_mul_latency": 1,
+            "_comment0": "Old SRAM config. The following three config are not used",
+            "spad_size": 1024,
+            "accum_spad_size": 1024,
+            "__sram_size": 7168,
+
+            "_comment1": "SRAM config",
+            "sram_size": 134218,
+            "sram_width": 128,
+
+            "_comment2": "Vector config. total bit: 32 * 8 * 128 = 32,768",
+            "process_bit": 32,
+            "vector_core_width": 128,
+            "_comment3": "div and mac were eliminated",
+            "add_latency": 1,
+            "mul_latency": 1,
+            "exp_latency": 1,
+            "gelu_latency": 1,
+            "add_tree_latency": 1,
+            "scalar_sqrt_latency": 1,
+            "scalar_add_latency": 1,
+            "scalar_mul_latency": 1,
+
+            "systolic_array_count": 8,
+            "vector_core_count": 8
+        },
+        "core_1": {
+            "core_type": "systolic_ws",
+            "core_width": 128,
+            "core_height": 128,
+
+            "spad_size": 1024,
+            "accum_spad_size": 1024,
+            "__sram_size": 7168,
+
+            "sram_size": 134218,
+            "sram_width": 128,
+
+            "process_bit": 32,
+            "vector_core_width": 128,
+            "add_latency": 1,
+            "mul_latency": 1,
+            "exp_latency": 1,
+            "gelu_latency": 1,
+            "add_tree_latency": 1,
+            "scalar_sqrt_latency": 1,
+            "scalar_add_latency": 1,
+            "scalar_mul_latency": 1,
+
+            "systolic_array_count": 8,
+            "vector_core_count": 8
+        }
+    },
 
     "icnt_type": "simple",
     "icnt_latency": 1,
