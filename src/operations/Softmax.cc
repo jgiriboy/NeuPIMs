@@ -68,7 +68,7 @@ Tile Softmax::initialize_instructions(uint32_t N, uint32_t req_idx) {
     addr_type sram_activation_base = SPAD_BASE;
     addr_type sram_accumulation_base = ACCUM_SPAD_BASE;
 
-    const uint32_t loop_size = _config.vector_core_width;
+    const uint32_t loop_size = _config.core_config[target_core].vector_core_width;
 
     auto activation_tensor = std::static_pointer_cast<NPUTensor>(_inputs[req_idx]);
     auto output_tensor = std::static_pointer_cast<NPUTensor>(_outputs[req_idx]);
@@ -132,7 +132,7 @@ void Softmax::calculate_loops(uint32_t req_idx) {
     }
     _inner_loop[0] = _prod_batches;
 
-    while (sram_size_needed() > _config.spad_size KB / 2) {
+    while (sram_size_needed() > _config.core_config[target_core].spad_size KB / 2) {
         _outer_loop[0] *= 2;
         _inner_loop[0] = (_inner_loop[0] & 1) + (_inner_loop[0] >> 1);
         spdlog::info("SoftMax inner loop: {}, outer loop: {}", _inner_loop, _outer_loop);
@@ -146,8 +146,8 @@ void Softmax::calculate_loops(uint32_t req_idx) {
 uint32_t Softmax::sram_size_needed() {
     auto n = _inner_loop[0];
     auto k = _input_dim.back();
-    if (k % _config.vector_core_width != 0) {
-        k += _config.vector_core_width - k % _config.vector_core_width;
+    if (k % _config.core_config[target_core].vector_core_width != 0) {
+        k += _config.core_config[target_core].vector_core_width - k % _config.core_config[target_core].vector_core_width;
     }
 
     return n * (2 * k + 1) * _config.precision;

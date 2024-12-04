@@ -65,7 +65,7 @@ Tile Add::initialize_instructions(uint32_t N) {
     addr_type sram_activation_base = SPAD_BASE;
     addr_type sram_accumulation_base = ACCUM_SPAD_BASE;
 
-    const uint32_t loop_size = _config.vector_core_width;
+    const uint32_t loop_size = _config.core_config[target_core].vector_core_width;
 
     auto activation_tensor0 = std::static_pointer_cast<NPUTensor>(_inputs[0]);
     auto activation_tensor1 = std::static_pointer_cast<NPUTensor>(_inputs[1]);
@@ -135,7 +135,7 @@ void Add::calculate_loops() {
     }
     _inner_loop[0] = _prod_batches;
 
-    while (sram_size_needed() > _config.spad_size KB / 2) {
+    while (sram_size_needed() > _config.core_config[target_core].spad_size KB / 2) {
         _outer_loop[0] *= 2;
         _inner_loop[0] = (_inner_loop[0] & 1) + (_inner_loop[0] >> 1);
     }
@@ -144,8 +144,8 @@ void Add::calculate_loops() {
 uint32_t Add::sram_size_needed() {
     auto n = _inner_loop[0];
     auto k = _input_dim.back();
-    if (k % _config.core_width != 0) {
-        k += _config.core_width - k % _config.core_width;
+    if (k % _config.core_config[target_core].core_width != 0) {
+        k += _config.core_config[target_core].core_width - k % _config.core_config[target_core].core_width;
     }
 
     return 3 * n * k * _config.precision;

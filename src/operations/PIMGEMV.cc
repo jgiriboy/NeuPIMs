@@ -207,7 +207,7 @@ Tile PIMGEMV::initialize_instructions() {
 }
 
 void PIMGEMV::calculate_loops() {
-    assert(sram_size_needed() < _config.spad_size KB / 2);
+    assert(sram_size_needed() < _config.core_config[target_core].spad_size KB / 2);
 
     uint32_t E = _config.model_n_embd;
     uint32_t page_size = _config.dram_page_size / _config.precision;

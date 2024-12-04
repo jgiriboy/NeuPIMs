@@ -306,7 +306,7 @@ void NeuPIMSAttend::calculate_loops() {
             // now support only incremental phases
         }
 
-        if (sram_needs > _config.spad_size KB / _config.precision) {
+        if (sram_needs > _config.core_config[target_core].spad_size KB / _config.precision) {
             assert(i > 0);
             _req_idxs.push_back(i - 1);
             sram_needs = need_sram_for_req;

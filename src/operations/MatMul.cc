@@ -131,7 +131,7 @@ Tile MatMul::initialize_instructions(uint32_t B, uint32_t M, uint32_t K, uint32_
     addr_type sram_weight_base = SPAD_BASE + m_inner * k_inner * _config.precision;
     addr_type sram_accumulation_base = ACCUM_SPAD_BASE;
 
-    const uint32_t loop_size = _config.core_width;
+    const uint32_t loop_size = _config.core_config[target_core].core_width;
 
     auto activation_tensor = std::static_pointer_cast<NPUTensor>(_inputs[0]);
     auto weight_tensor = std::static_pointer_cast<NPUTensor>(_inputs[1]);
@@ -398,7 +398,7 @@ void MatMul::calculate_loops() {
         _prod_batches *= larger_dims[i];
     }
 
-    while (sram_size_needed() > _config.spad_size KB / 2)  // double buffer
+    while (sram_size_needed() > _config.core_config[target_core].spad_size KB / 2)  // double buffer
     {
         // max_element return iterator
         // divide max_element dimension to 1/2,
@@ -427,16 +427,16 @@ uint32_t MatMul::sram_size_needed() {
     // and load into SRAM.
 
     auto n = _inner_loop[0];
-    if (n % _config.core_width != 0) {
-        n += _config.core_width - n % _config.core_width;
+    if (n % _config.core_config[target_core].core_width != 0) {
+        n += _config.core_config[target_core].core_width - n % _config.core_config[target_core].core_width;
     }
     auto k = _inner_loop[1];
-    if (k % _config.core_width != 0) {
-        k += _config.core_width - k % _config.core_width;
+    if (k % _config.core_config[target_core].core_width != 0) {
+        k += _config.core_config[target_core].core_width - k % _config.core_config[target_core].core_width;
     }
     auto m = _inner_loop[2];
-    if (m % _config.core_width != 0) {
-        m += _config.core_width - m % _config.core_width;
+    if (m % _config.core_config[target_core].core_width != 0) {
+        m += _config.core_config[target_core].core_width - m % _config.core_config[target_core].core_width;
     }
 
     return (n * k + k * m + m * n) * _config.precision;

@@ -96,7 +96,7 @@ void Attention::calculate_loops() {
 
     uint32_t input_size = _N * _E;
 
-    uint32_t sram_capacity = _config.spad_size KB / 2;
+    uint32_t sram_capacity = _config.core_config[target_core].spad_size KB / 2;
     uint32_t sram_size = sram_capacity / _config.precision;
 
     uint32_t remain_size = sram_size - input_size;

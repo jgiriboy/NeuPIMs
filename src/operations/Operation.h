@@ -49,6 +49,8 @@ class Operation : public std::enable_shared_from_this<Operation> {
 
     void set_as_parent_tensor(std::vector<Ptr<BTensor>> inputs);
     bool check_finish() { return _finish; };
+    
+    uint32_t target_core = 0;
 
     void reduce_tile(Tile &tile);
     OperationStat get_stat() { return _stat; };

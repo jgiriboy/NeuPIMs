@@ -301,7 +301,7 @@ Tile NeuPIMSLogitSoftmax::initialize_instructions(int start, int end) {
 }
 
 void NeuPIMSLogitSoftmax::calculate_loops() {
-    assert(sram_size_needed() < _config.spad_size KB / 2);
+    assert(sram_size_needed() < _config.core_config[target_core].spad_size KB / 2);
 
     uint32_t E = _config.model_n_embd / _config.n_tp;
     // dram row capacity (unit: number of parameter)
@@ -326,7 +326,7 @@ uint32_t NeuPIMSLogitSoftmax::sram_size_needed() {
     // initiation phase: li*dk*3 + 2li^2 + li*dk
     // incremental phase: 2*li + dk
 
-    int sram_size = _config.spad_size KB / _config.precision;
+    int sram_size = _config.core_config[target_core].spad_size KB / _config.precision;
 
     int dram_page_size = _config.dram_page_size / _config.precision;
     int heads_per_dram_page = floor((double)dram_page_size / _dk);

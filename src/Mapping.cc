@@ -32,6 +32,7 @@ std::map<Mapping::LoopCounts, Mapping> parse_mapping_file(std::string mapping_pa
 MappingTable from_config(SimulationConfig config) {
     std::map<Mapping::LoopCounts, Mapping> map;
     // todo generate mapping table from configuration file
+    // TODO: 여기가 수정이 되어야 target_core를 진짜로 잘 사용할 수 있는 것 같음.
     return map;
 }
 

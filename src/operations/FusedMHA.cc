@@ -253,7 +253,7 @@ void FusedMHA::calculate_loops() {
         uint32_t total_size_per_head = 2 * q_len * _dk + 2 * _dk * seq_len + seq_len * q_len;
         total_size_per_head *= _config.precision;  // unit: byte
 
-        uint32_t sram_capacity = _config.spad_size KB / 2;  // unit: byte
+        uint32_t sram_capacity = _config.core_config[target_core].spad_size KB / 2;  // unit: byte
 
         uint32_t heads_per_tile = sram_capacity / total_size_per_head;
         if (heads_per_tile > _nh) heads_per_tile = _nh;

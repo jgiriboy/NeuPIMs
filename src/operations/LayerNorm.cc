@@ -110,7 +110,7 @@ Tile LayerNorm::initialize_instructions(uint32_t N) {
     addr_type sram_accumulation_base = ACCUM_SPAD_BASE;
 
     // xxx not used
-    const uint32_t loop_size = _config.vector_core_width;
+    const uint32_t loop_size = _config.core_config[target_core].vector_core_width;
 
     auto activation_tensor = std::static_pointer_cast<NPUTensor>(_inputs[0]);
     auto gamma_tensor = std::static_pointer_cast<NPUTensor>(_inputs[1]);
@@ -213,7 +213,7 @@ void LayerNorm::calculate_loops() {
     }
     _inner_loop[0] = _prod_batches;
 
-    while (sram_size_needed() > _config.spad_size KB / 2) {
+    while (sram_size_needed() > _config.core_config[target_core].spad_size KB / 2) {
         _outer_loop[0] *= 2;
         _inner_loop[0] = (_inner_loop[0] & 1) + (_inner_loop[0] >> 1);
     }
@@ -224,8 +224,8 @@ void LayerNorm::calculate_loops() {
 uint32_t LayerNorm::sram_size_needed() {
     auto n = _inner_loop[0];
     auto k = _prod_weight_dim;
-    if (k % _config.core_width != 0) {
-        k += _config.core_width - k % _config.core_width;
+    if (k % _config.core_config[target_core].core_width != 0) {
+        k += _config.core_config[target_core].core_width - k % _config.core_config[target_core].core_width;
     }
 
     return k * (n * 3 + 2) * _config.precision;

@@ -15,6 +15,7 @@ struct Mapping {
         uint32_t R = 1; // Weight width
         uint32_t Q = 1; // INput height
         uint32_t P = 1; // Input width
+        uint32_t target_core = 0;
         bool operator==(const LoopCounts &other) const {
             return (N == other.N) && (C == other.C) && (M == other.M) && (S == other.S) &&
                    (R == other.R) && (Q == other.Q) && (P == other.P);

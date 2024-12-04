@@ -133,6 +133,7 @@ std::shared_ptr<Tensor> Model::load_cache(uint32_t layer, std::string type) {
     return create_tensor("layer" + std::to_string(layer) + "." + type, shape);
 }
 
+// EE514 Note: 이 메서드 안씀. OperationFactory가 사라진 이유?
 std::shared_ptr<Operation> Model::register_operation(std::shared_ptr<Operation> op) {
     // auto id = op->get_id();
     // _operation_map[id] = op;
