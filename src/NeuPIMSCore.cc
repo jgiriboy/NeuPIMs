@@ -30,17 +30,17 @@ NeuPIMSCore::NeuPIMSCore(uint32_t id, SimulationConfig config)
       _stat_add_cycle(0),
       _stat_gelu_cycle(0),
       _stat_softmax_cycle(0),
-      _spad(Sram(config, _core_cycle, false)),
-      _acc_spad(Sram(config, _core_cycle, true)),
-      _pim_spad(Sram(config, _core_cycle, false)),
-      _pim_acc_spad(Sram(config, _core_cycle, true)) {
+      _spad(Sram(config, _core_cycle, false, id)),
+      _acc_spad(Sram(config, _core_cycle, true, id)),
+      _pim_spad(Sram(config, _core_cycle, false, id)),
+      _pim_acc_spad(Sram(config, _core_cycle, true, id)) {
     _waiting_write_reqs = 0;
     _running_layer = -1;
     _current_spad = 0;
     _current_acc_spad = 0;
     _memory_request_queues1.resize(_config.dram_channels);
     _memory_request_queues2.resize(_config.dram_channels);
-    _vector_pipelines.resize(_config.vector_core_count);
+    _vector_pipelines.resize(_config.core_config[id].vector_core_count);
 }
 bool NeuPIMSCore::can_issue_pim() { return _pim_tiles.empty(); }
 // if next_tile.accum == true
@@ -145,7 +145,7 @@ void NeuPIMSCore::issue(Tile &in_tile) {
                 tile->remaining_loads++;
                 _ld_inst_queue_for_sa.push(inst);
             } else {
-                spdlog::info("sram size: {} / sram used: {}", _config.sram_size KB / 2,
+                spdlog::info("sram size: {} / sram used: {}", _config.core_config[_id].sram_size KB / 2,
                              buffer->get_current_size(buffer_id));
                 spdlog::info("instruction destination address {:x}", inst.dest_addr);
                 spdlog::info("failed to allocate {} on sram.", inst.size);
@@ -217,7 +217,7 @@ void NeuPIMSCore::issue_pim(Tile &in_tile) {
                 spdlog::info("check_allocated: {}",
                              buffer->check_allocated(inst.dest_addr, buffer_id));
                 spdlog::info("check_remain: {}", buffer->check_remain(inst.size, buffer_id));
-                spdlog::info("sram size: {} / sram used: {}", _config.sram_size KB / 2,
+                spdlog::info("sram size: {} / sram used: {}", _config.core_config[_id].sram_size KB / 2,
                              buffer->get_current_size(buffer_id));
                 spdlog::info("instruction destination address {:x}", inst.dest_addr);
                 spdlog::info("failed to allocate {} on sram.", inst.size);

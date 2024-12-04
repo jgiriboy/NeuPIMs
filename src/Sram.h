@@ -2,8 +2,8 @@
 #include "Common.h"
 
 class Sram {
-   public:
-    Sram(SimulationConfig config, const cycle_type &core_cycle, bool accum);
+  public:
+    Sram(SimulationConfig config, const cycle_type &core_cycle, bool accum, uint32_t core_id);
 
     bool check_hit(addr_type address, int buffer_id);
     bool check_full(int buffer_id);
@@ -20,7 +20,7 @@ class Sram {
     void print_all(int buffer_id);
     void print_non_valid(int buffer_id);
 
-   private:
+  private:
     struct SramEntry {
         bool valid;
         addr_type address;

@@ -129,6 +129,9 @@ class Model {
     bool _is_decode;
     uint64_t _wgt_size;  // bytes
 
+    // EE514 Note: Distribute workloads using this?
+    uint32_t _target_core;
+
     // for gpt
     uint32_t _num_batch;
     uint32_t _num_token;

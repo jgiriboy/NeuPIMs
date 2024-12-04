@@ -10,10 +10,10 @@ uint32_t generate_mem_access_id() {
 }
 
 namespace AddressConfig {
-addr_type alignment = Config::global_config.dram_req_size;  // BL * dev width / 8 bytes
-addr_type channel_mask;                                     // not used
-addr_type channel_offset;                                   // not used
-}  // namespace AddressConfig
+addr_type alignment = Config::global_config.dram_req_size; // BL * dev width / 8 bytes
+addr_type channel_mask;                                    // not used
+addr_type channel_offset;                                  // not used
+} // namespace AddressConfig
 
 int MemoryAccess::req_count = 0;
 int MemoryAccess::pre_req_count = 0;
@@ -70,15 +70,13 @@ addr_type AddressConfig::align(addr_type addr) {
     return aligned_addr;
 }
 
-std::vector<MemoryAccess *> MemoryAccess::from_instruction(Instruction &inst, uint32_t id,
-                                                           uint32_t size, MemoryAccessType req_type,
-                                                           bool request, uint32_t core_id,
+std::vector<MemoryAccess *> MemoryAccess::from_instruction(Instruction &inst, uint32_t id, uint32_t size,
+                                                           MemoryAccessType req_type, bool request, uint32_t core_id,
                                                            cycle_type start_cycle, int buffer_id,
                                                            StagePlatform stage_platform) {
     static addr_type const_addr = 0;
-    const addr_type max_address = Config::global_config.model_n_embd *
-                                  Config::global_config.model_n_embd * 5 * 2 /
-                                  Config::global_config.n_tp;
+    const addr_type max_address =
+        Config::global_config.model_n_embd * Config::global_config.model_n_embd * 5 * 2 / Config::global_config.n_tp;
 
     robin_hood::unordered_set<addr_type> aligned_src_addrs;
     for (auto addr : inst.src_addrs) {
@@ -117,81 +115,93 @@ void PrintColor(Color color, std::string str) {
     return;
     std::string color_code;
     switch (color) {
-        case Color::RED:
-            color_code = "\033[1;31m";
-            break;
-        case Color::GREEN:
-            color_code = "\033[1;32m";
-            break;
-        case Color::YELLOW:
-            color_code = "\033[1;33m";
-            break;
-        case Color::BLUE:
-            color_code = "\033[1;34m";
-            break;
-        case Color::MAGENTA:
-            color_code = "\033[1;35m";
-            break;
-        case Color::CYAN:
-            color_code = "\033[1;36m";
-            break;
-        default:
-            color_code = "";
+    case Color::RED:
+        color_code = "\033[1;31m";
+        break;
+    case Color::GREEN:
+        color_code = "\033[1;32m";
+        break;
+    case Color::YELLOW:
+        color_code = "\033[1;33m";
+        break;
+    case Color::BLUE:
+        color_code = "\033[1;34m";
+        break;
+    case Color::MAGENTA:
+        color_code = "\033[1;35m";
+        break;
+    case Color::CYAN:
+        color_code = "\033[1;36m";
+        break;
+    default:
+        color_code = "";
     }
     std::cout << color_code << str << "\033[0m" << std::endl;
 }
 
 SimulationConfig Config::global_config;
 
+const static std::map<std::string, CoreType> available_core_types = {{"systolic_os", CoreType::SYSTOLIC_OS},
+                                                                     {"systolic_ws", CoreType::SYSTOLIC_WS}};
+
+const static std::map<std::string, IcntType> available_icnt_types = {{"simple", IcntType::SIMPLE},
+                                                                     {"booksim2", IcntType::BOOKSIM2}};
+
 SimulationConfig initialize_config(json config) {
     SimulationConfig parsed_config;
-
     /* Core configs */
     parsed_config.num_cores = config["num_cores"];
-    if ((std::string)config["core_type"] == "systolic_os")
-        parsed_config.core_type = CoreType::SYSTOLIC_OS;
-    else if ((std::string)config["core_type"] == "systolic_ws")
-        parsed_config.core_type = CoreType::SYSTOLIC_WS;
-    else
-        throw std::runtime_error(
-            fmt::format("Not implemented core type {} ", (std::string)config["core_type"]));
     parsed_config.core_freq = config["core_freq"];
-    parsed_config.core_width = config["core_width"];
-    parsed_config.core_height = config["core_height"];
+    parsed_config.core_config = new struct CoreConfig[parsed_config.num_cores];
 
-    /* Vector configs */
-    parsed_config.process_bit = config["process_bit"];
+    for (uint32_t core_id = 0; core_id < parsed_config.num_cores; core_id++) {
+        std::string core_id_str = "core_" + std::to_string(core_id);
+        auto core_config = config["core_config"][core_id_str];
 
-    parsed_config.vector_core_count = config["vector_core_count"];
-    parsed_config.vector_core_width = config["vector_core_width"];
-    parsed_config.add_latency = config["add_latency"];
-    parsed_config.mul_latency = config["mul_latency"];
-    parsed_config.exp_latency = config["exp_latency"];
-    parsed_config.gelu_latency = config["gelu_latency"];
-    parsed_config.add_tree_latency = config["add_tree_latency"];
-    parsed_config.scalar_sqrt_latency = config["scalar_sqrt_latency"];
-    parsed_config.scalar_add_latency = config["scalar_add_latency"];
-    parsed_config.scalar_mul_latency = config["scalar_mul_latency"];
+        if (available_core_types.count((std::string)core_config["core_type"]) > 0) {
+            parsed_config.core_config[core_id].core_type = core_config["core_type"];
+        } else {
+            throw std::runtime_error( 
+                fmt::format("Not implemented core type {} ", (std::string)core_config["core_type"]));
+        }
+        parsed_config.core_config[core_id].core_width = core_config["core_width"];
+        parsed_config.core_config[core_id].core_height = core_config["core_height"];
 
-    /* SRAM configs */
-    parsed_config.sram_size = config["sram_size"];
-    parsed_config.sram_width = config["sram_width"];
-    parsed_config.spad_size = config["sram_size"];
-    parsed_config.accum_spad_size = config["sram_size"];
+        /* SRAM configs */
+        parsed_config.core_config[core_id].sram_width = core_config["sram_width"];
+        parsed_config.core_config[core_id].sram_size = core_config["sram_size"];
+        parsed_config.core_config[core_id].spad_size = core_config["sram_size"];
+        parsed_config.core_config[core_id].accum_spad_size = core_config["sram_size"];
+
+        /* Vector configs */
+        parsed_config.core_config[core_id].process_bit = core_config["process_bit"];
+        parsed_config.core_config[core_id].vector_core_width = core_config["vector_core_width"];
+        parsed_config.core_config[core_id].add_latency = core_config["add_latency"];
+        parsed_config.core_config[core_id].mul_latency = core_config["mul_latency"];
+        parsed_config.core_config[core_id].exp_latency = core_config["exp_latency"];
+        parsed_config.core_config[core_id].gelu_latency = core_config["gelu_latency"];
+        parsed_config.core_config[core_id].add_tree_latency = core_config["add_tree_latency"];
+        parsed_config.core_config[core_id].scalar_sqrt_latency = core_config["scalar_sqrt_latency"];
+        parsed_config.core_config[core_id].scalar_add_latency = core_config["scalar_add_latency"];
+        parsed_config.core_config[core_id].scalar_mul_latency = core_config["scalar_mul_latency"];
+
+        parsed_config.core_config[core_id].vector_core_count = core_config["vector_core_count"];
+        // where's a systolic_array_count?
+    }
 
     /* log config*/
     parsed_config.operation_log_output_path = config["operation_log_output_path"];
 
     /* Icnt config */
-    if ((std::string)config["icnt_type"] == "simple")
-        parsed_config.icnt_type = IcntType::SIMPLE;
-    else if ((std::string)config["icnt_type"] == "booksim2")
-        parsed_config.icnt_type = IcntType::BOOKSIM2;
-    else
-        throw std::runtime_error(
-            fmt::format("Not implemented icnt type {} ", (std::string)config["icnt_type"]));
+    if (available_icnt_types.count((std::string)config["icnt_type"]) > 0) {
+        parsed_config.icnt_type = config["icnt_type"];
+    } else {
+        throw std::runtime_error(fmt::format("Not implemented icnt type {} ", (std::string)config["icnt_type"]));
+    }
+
     parsed_config.icnt_freq = config["icnt_freq"];
-    if (config.contains("icnt_latency")) parsed_config.icnt_latency = config["icnt_latency"];
+    if (config.contains("icnt_latency"))
+        parsed_config.icnt_latency = config["icnt_latency"];
     if (config.contains("icnt_config_path"))
         parsed_config.icnt_config_path = config["icnt_config_path"];
 
@@ -212,8 +222,7 @@ void initialize_memory_config(std::string mem_config_path) {
     else if ((std::string)mem_config["dram_type"] == "neupims")
         Config::global_config.dram_type = DramType::NEUPIMS;
     else
-        throw std::runtime_error(
-            fmt::format("Not implemented dram type {} ", (std::string)mem_config["dram_type"]));
+        throw std::runtime_error(fmt::format("Not implemented dram type {} ", (std::string)mem_config["dram_type"]));
     Config::global_config.dram_freq = mem_config["dram_freq"];
 
     Config::global_config.dram_channels = mem_config["dram_channels"];
@@ -288,80 +297,80 @@ json load_config(std::string config_path) {
 
 std::string memAccessTypeString(MemoryAccessType type) {
     switch (type) {
-        case (MemoryAccessType::READ):
-            return "READ";
-        case (MemoryAccessType::WRITE):
-            return "WRITE";
-        case (MemoryAccessType::GWRITE):
-            return "GWRITE";
-        case (MemoryAccessType::COMP):
-            return "COMP";
-        case (MemoryAccessType::READRES):
-            return "READRES";
-        case (MemoryAccessType::P_HEADER):
-            return "P_HEADER";
-        case (MemoryAccessType::COMPS_READRES):
-            return "COMPS_READRES";
-        default:
-            assert(0);
+    case (MemoryAccessType::READ):
+        return "READ";
+    case (MemoryAccessType::WRITE):
+        return "WRITE";
+    case (MemoryAccessType::GWRITE):
+        return "GWRITE";
+    case (MemoryAccessType::COMP):
+        return "COMP";
+    case (MemoryAccessType::READRES):
+        return "READRES";
+    case (MemoryAccessType::P_HEADER):
+        return "P_HEADER";
+    case (MemoryAccessType::COMPS_READRES):
+        return "COMPS_READRES";
+    default:
+        assert(0);
     }
     return "Unknown";
 }
 
 std::string opcodeTypeString(Opcode opcode) {
     switch (opcode) {
-        case (Opcode::MOVIN):
-            return "MOVIN";
-        case (Opcode::MOVOUT):
-            return "MOVOUT";
-        case (Opcode::PIM_HEADER):
-            return "PIM_HEADER";
-        case (Opcode::PIM_COMP):
-            return "PIM_COMP";
-        case (Opcode::PIM_GWRITE):
-            return "PIM_GWRITE";
-        case (Opcode::PIM_READRES):
-            return "PIM_READRES";
-        case (Opcode::PIM_COMPS_READRES):
-            return "PIM_COMPS_READRES";
-        default:
-            return "Unknown";
+    case (Opcode::MOVIN):
+        return "MOVIN";
+    case (Opcode::MOVOUT):
+        return "MOVOUT";
+    case (Opcode::PIM_HEADER):
+        return "PIM_HEADER";
+    case (Opcode::PIM_COMP):
+        return "PIM_COMP";
+    case (Opcode::PIM_GWRITE):
+        return "PIM_GWRITE";
+    case (Opcode::PIM_READRES):
+        return "PIM_READRES";
+    case (Opcode::PIM_COMPS_READRES):
+        return "PIM_COMPS_READRES";
+    default:
+        return "Unknown";
     }
 }
 
 std::string Instruction::repr() {
     std::string ret;
     switch (opcode) {
-        case (Opcode::MOVIN):
-            ret += "MOVIN";
-            break;
-        case (Opcode::MOVOUT):
-            ret += "MOVOUT";
-            break;
-        case (Opcode::GEMM_PRELOAD):
-            ret += "GEMM_PRELOAD";
-            break;
-        case (Opcode::GEMM):
-            ret += "GEMM";
-            break;
-        case (Opcode::BAR):
-            ret += "BAR";
-            break;
-        case (Opcode::LAYERNORM):
-            ret += "LAYERNORM";
-            break;
-        case (Opcode::GELU):
-            ret += "GELU";
-            break;
-        case (Opcode::SOFTMAX):
-            ret += "SOFTMAX";
-            break;
-        case (Opcode::ADD):
-            ret += "ADD";
-            break;
-        case (Opcode::DUMMY):
-            ret += "DUMMY";
-            break;
+    case (Opcode::MOVIN):
+        ret += "MOVIN";
+        break;
+    case (Opcode::MOVOUT):
+        ret += "MOVOUT";
+        break;
+    case (Opcode::GEMM_PRELOAD):
+        ret += "GEMM_PRELOAD";
+        break;
+    case (Opcode::GEMM):
+        ret += "GEMM";
+        break;
+    case (Opcode::BAR):
+        ret += "BAR";
+        break;
+    case (Opcode::LAYERNORM):
+        ret += "LAYERNORM";
+        break;
+    case (Opcode::GELU):
+        ret += "GELU";
+        break;
+    case (Opcode::SOFTMAX):
+        ret += "SOFTMAX";
+        break;
+    case (Opcode::ADD):
+        ret += "ADD";
+        break;
+    case (Opcode::DUMMY):
+        ret += "DUMMY";
+        break;
     }
     ret += " / src_addrs.size() : ";
     ret += std::to_string(src_addrs.size());
@@ -373,21 +382,21 @@ std::string Instruction::repr() {
 std::string Tile::repr() {
     std::string ret;
     switch (status) {
-        case Status::INITIALIZED:
-            ret += "init ";
-            break;
-        case Status::RUNNING:
-            ret += "run ";
-            break;
-        case Status::FINISH:
-            ret += "fin ";
-            break;
-        case Status::BAR:
-            ret += "bar ";
-            break;
-        case Status::EMPTY:
-            ret += "emp ";
-            break;
+    case Status::INITIALIZED:
+        ret += "init ";
+        break;
+    case Status::RUNNING:
+        ret += "run ";
+        break;
+    case Status::FINISH:
+        ret += "fin ";
+        break;
+    case Status::BAR:
+        ret += "bar ";
+        break;
+    case Status::EMPTY:
+        ret += "emp ";
+        break;
     }
     ret += optype + " ";
     ret += std::to_string(operation_id) + " ";
@@ -415,7 +424,8 @@ void print_backtrace() {
 }
 
 void ast(bool cond) {
-    if (cond) return;
+    if (cond)
+        return;
 
     print_backtrace();
     spdlog::error("assertion failed");
@@ -423,36 +433,35 @@ void ast(bool cond) {
     // exit(-1);
 }
 
-MemoryAccess *TransToMemoryAccess(Instruction &inst, uint32_t size, uint32_t core_id,
-                                  cycle_type start_cycle, int buffer_id,
-                                  StagePlatform stage_platform) {
+MemoryAccess *TransToMemoryAccess(Instruction &inst, uint32_t size, uint32_t core_id, cycle_type start_cycle,
+                                  int buffer_id, StagePlatform stage_platform) {
     MemoryAccessType req_type;
     switch (inst.opcode) {
-        case Opcode::PIM_HEADER:
-            req_type = MemoryAccessType::P_HEADER;
-            break;
-        case Opcode::PIM_GWRITE:
-            req_type = MemoryAccessType::GWRITE;
-            break;
-        case Opcode::PIM_COMP:
-            req_type = MemoryAccessType::COMP;
-            break;
-        case Opcode::PIM_READRES:
-            req_type = MemoryAccessType::READRES;
-            break;
-        case Opcode::PIM_COMPS_READRES:
-            req_type = MemoryAccessType::COMPS_READRES;
-            break;
-        case Opcode::MOVIN:
-            req_type = MemoryAccessType::READ;
-            break;
-        case Opcode::MOVOUT:
-            req_type = MemoryAccessType::WRITE;
-            break;
-        default:
-            req_type = MemoryAccessType::SIZE;
-            spdlog::error("Fail to translate unknown Instruction to MemoryAccessType");
-            break;
+    case Opcode::PIM_HEADER:
+        req_type = MemoryAccessType::P_HEADER;
+        break;
+    case Opcode::PIM_GWRITE:
+        req_type = MemoryAccessType::GWRITE;
+        break;
+    case Opcode::PIM_COMP:
+        req_type = MemoryAccessType::COMP;
+        break;
+    case Opcode::PIM_READRES:
+        req_type = MemoryAccessType::READRES;
+        break;
+    case Opcode::PIM_COMPS_READRES:
+        req_type = MemoryAccessType::COMPS_READRES;
+        break;
+    case Opcode::MOVIN:
+        req_type = MemoryAccessType::READ;
+        break;
+    case Opcode::MOVOUT:
+        req_type = MemoryAccessType::WRITE;
+        break;
+    default:
+        req_type = MemoryAccessType::SIZE;
+        spdlog::error("Fail to translate unknown Instruction to MemoryAccessType");
+        break;
     }
 
     auto it = inst.src_addrs.begin();
@@ -463,8 +472,8 @@ MemoryAccess *TransToMemoryAccess(Instruction &inst, uint32_t size, uint32_t cor
         .id = generate_mem_access_id(),
         .dram_address = dram_addr,
         .spad_address = inst.dest_addr,
-        .size = size,          //
-        .req_type = req_type,  //
+        .size = size,         //
+        .req_type = req_type, //
         .request = true,
         .core_id = core_id,
         .start_cycle = start_cycle,
@@ -484,8 +493,7 @@ int LogBase2(int power_of_two) {
     return i;
 }
 
-uint64_t AddressConfig::make_address(int channel, int rank, int bankgroup, int bank, int row,
-                                     int col) {
+uint64_t AddressConfig::make_address(int channel, int rank, int bankgroup, int bank, int row, int col) {
     // rorabgbachco
     // HBM2_8Gb_s128_pim.ini
     uint64_t addr = 0;
@@ -529,8 +537,7 @@ uint64_t AddressConfig::make_address(int channel, int rank, int bankgroup, int b
     return addr;
 }
 
-uint64_t AddressConfig::encode_pim_header(int channel, int row, bool for_gwrite, int num_comps,
-                                          int num_readres) {
+uint64_t AddressConfig::encode_pim_header(int channel, int row, bool for_gwrite, int num_comps, int num_readres) {
     int gwrite_bit = for_gwrite ? 1 : 0;
 
     // we can use only 4 bits for column bit
@@ -538,8 +545,7 @@ uint64_t AddressConfig::encode_pim_header(int channel, int row, bool for_gwrite,
     int log_comps = (gwrite_bit << 3) + LogBase2(num_comps);
     int log_readres = LogBase2(num_readres);
 
-    return make_address(channel, log_readres / 16, (log_readres / 4) & 3, log_readres % 4, row,
-                        log_comps);
+    return make_address(channel, log_readres / 16, (log_readres / 4) & 3, log_readres % 4, row, log_comps);
 }
 
 uint64_t AddressConfig::encode_pim_comps_readres(int ch, int row, int num_comps, bool last_cmd) {

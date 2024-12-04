@@ -14,7 +14,7 @@
 #define ICNT_MASK 0x1 << 3
 
 class Simulator {
-   public:
+  public:
     Simulator(SimulationConfig config);
     void launch_model(Ptr<Model> model);
     void run(std::string model_name);
@@ -22,7 +22,7 @@ class Simulator {
     // void run_offline(std::string model_name, uint32_t sample_count);
     // void run_multistream(std::string model_name, uint32_t sample_count,
     // uint32_t ); void run_server(std::string trace_path);
-   private:
+  private:
     void cycle();
     bool running();
     void set_cycle_mask();
@@ -51,17 +51,17 @@ class Simulator {
 
     addr_type _dram_ch_stride_size;
 
-    uint64_t _core_cycles;
+    cycle_type _core_cycles;
 
-    uint32_t _cycle_mask;
+    cycle_type _cycle_mask;
     bool _single_run;
     Ptr<Model> _model;
 
     struct StageStat {
         Stage stage;
-        uint32_t done_cycle;
-        uint32_t pim_cycles;
-        uint32_t npu_cycles;
+        cycle_type done_cycle;
+        cycle_type pim_cycles;
+        cycle_type npu_cycles;
         double mem_bw_util;
     };
 

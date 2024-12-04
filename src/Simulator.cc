@@ -20,8 +20,7 @@ Simulator::Simulator(SimulationConfig config) : _config(config), _core_cycles(0)
     _dram_time = 0.0;
     _icnt_time = 0.0;
 
-    std::string pim_config =
-        fs::path(__FILE__).parent_path().append(config.pim_config_path).string();
+    std::string pim_config = fs::path(__FILE__).parent_path().append(config.pim_config_path).string();
     spdlog::info("Newton config: {}", pim_config);
     config.pim_config_path = pim_config;
     _dram = std::make_unique<PIM>(config);
@@ -41,6 +40,7 @@ Simulator::Simulator(SimulationConfig config) : _config(config), _core_cycles(0)
     _n_memories = config.dram_channels;
     for (int core_index = 0; core_index < _n_cores; core_index++) {
         spdlog::info("initializing NeuPIM SystolicWS cores.");
+        // TODO: support OS?
         _cores[core_index] = std::make_unique<NeuPIMSystolicWS>(core_index, _config);
     }
 
@@ -120,7 +120,7 @@ void Simulator::cycle() {
         set_cycle_mask();
         // Core Cycle
         if (_cycle_mask & CORE_MASK) {
-            while (_client->has_request()) {  // FIXME: change while to if
+            while (_client->has_request()) { // FIXME: change while to if
                 std::shared_ptr<InferRequest> infer_request = _client->pop_request();
                 _scheduler->add_request(infer_request);
             }
@@ -146,7 +146,8 @@ void Simulator::cycle() {
                 }
 
                 // Issue new tile to core
-                if (_scheduler->empty1() && _scheduler->empty2()) continue;
+                if (_scheduler->empty1() && _scheduler->empty2())
+                    continue;
 
                 // >>> todo: support 2 sub-batch
                 if (!_scheduler->empty1()) {

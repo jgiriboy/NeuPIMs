@@ -264,7 +264,7 @@ void SystolicWS::cycle() {
 }
 
 cycle_type SystolicWS::get_inst_compute_cycles(Instruction &inst) {
-    return _config.core_height + _config.core_width - 2 + MAX(inst.size, 4);
+    return _config.core_config[_id].core_height + _config.core_config[_id].core_width - 2 + MAX(inst.size, 4);
 }
 
 cycle_type SystolicWS::get_vector_compute_cycles(Instruction &inst) {
@@ -273,21 +273,21 @@ cycle_type SystolicWS::get_vector_compute_cycles(Instruction &inst) {
     cycle_type add_tree, scalar_ops, vector_ops;
     switch (inst.opcode) {
         case Opcode::LAYERNORM:
-            add_tree = 2 * add_tree_iter * _config.add_tree_latency;
-            scalar_ops = 2 * _config.scalar_mul_latency + _config.scalar_sqrt_latency;
+            add_tree = 2 * add_tree_iter * _config.core_config[_id].add_tree_latency;
+            scalar_ops = 2 * _config.core_config[_id].scalar_mul_latency + _config.core_config[_id].scalar_sqrt_latency;
             // 1 addition, 1 subtraction, 1 division, 2 multiplication.
-            vector_ops = vec_op_iter * (2 * _config.add_latency + 3 * _config.mul_latency);
+            vector_ops = vec_op_iter * (2 * _config.core_config[_id].add_latency + 3 * _config.core_config[_id].mul_latency);
             return add_tree + scalar_ops + vector_ops;
         case Opcode::SOFTMAX:
             // 1 add tree, 1 compare tree
-            add_tree = 2 * add_tree_iter * _config.add_tree_latency;
+            add_tree = 2 * add_tree_iter * _config.core_config[_id].add_tree_latency;
             vector_ops =
-                vec_op_iter * (_config.add_latency + _config.exp_latency + _config.mul_latency);
+                vec_op_iter * (_config.core_config[_id].add_latency + _config.core_config[_id].exp_latency + _config.core_config[_id].mul_latency);
             return add_tree + vector_ops;
         case Opcode::ADD:
-            return vec_op_iter * _config.add_latency;
+            return vec_op_iter * _config.core_config[_id].add_latency;
         case Opcode::GELU:
-            return vec_op_iter * _config.gelu_latency;
+            return vec_op_iter * _config.core_config[_id].gelu_latency;
         case Opcode::DUMMY:
             return 1;
     }
@@ -297,7 +297,7 @@ cycle_type SystolicWS::get_vector_compute_cycles(Instruction &inst) {
 }
 
 cycle_type SystolicWS::calculate_add_tree_iterations(uint32_t vector_size) {
-    uint32_t calculation_unit = _config.vector_core_width;
+    uint32_t calculation_unit = _config.core_config[_id].vector_core_width;
     if (vector_size <= calculation_unit) {
         return 1;
     }
@@ -310,7 +310,7 @@ cycle_type SystolicWS::calculate_add_tree_iterations(uint32_t vector_size) {
 }
 
 cycle_type SystolicWS::calculate_vector_op_iterations(uint32_t vector_size) {
-    uint32_t calculation_unit = _config.vector_core_width;
+    uint32_t calculation_unit = _config.core_config[_id].vector_core_width;
     uint32_t ret = vector_size / calculation_unit;
     if (vector_size % calculation_unit != 0) {
         ret++;
@@ -347,8 +347,8 @@ void SystolicWS::issue_ex_inst(Instruction inst) {
             offset = MAX(offset, 4);
             if (inst.opcode == Opcode::GEMM_PRELOAD) {
                 // State mul-pre
-                parent_tile->stat.weight_load_cycles += _config.core_height;
-                offset = _config.core_height;
+                parent_tile->stat.weight_load_cycles += _config.core_config[_id].core_height;
+                offset = MAX(offset,_config.core_config[_id].core_height);
             }
             inst.start_cycle = _compute_pipeline.back().start_cycle + offset;
         } else {
@@ -357,7 +357,7 @@ void SystolicWS::issue_ex_inst(Instruction inst) {
             if (inst.opcode == Opcode::GEMM_PRELOAD) {
                 /* Weight preload  from buffer latecny + WEight preload
                  * latency */
-                inst.start_cycle += _config.core_height + _config.core_height - 1;
+                inst.start_cycle += _config.core_config[_id].core_height + _config.core_config[_id].core_height - 1;
             }
         }
 
