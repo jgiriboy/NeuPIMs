@@ -354,9 +354,10 @@ typedef struct OperationStat {
             case StatType::NumCalculation:
                 return std::to_string(num_calculation);
             case StatType::NpuUtilization:
+            // TODO: core_config[0] -> core_config[core_id]
                 npu_util = (double)num_calculation /
-                           (double)(compute_cycles * Config::global_config.core_width *
-                                    Config::global_config.core_height);
+                           (double)(compute_cycles * Config::global_config.core_config[0].core_width *
+                                    Config::global_config.core_config[0].core_height);
                 return std::to_string(npu_util);
             default:
                 assert(0);

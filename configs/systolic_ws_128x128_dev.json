@@ -8,19 +8,15 @@
             "core_width": 128,
             "core_height": 128,
 
-            "_comment0": "Old SRAM config. The following three config are not used",
             "spad_size": 1024,
             "accum_spad_size": 1024,
             "__sram_size": 7168,
 
-            "_comment1": "SRAM config",
-            "sram_size": 134218,
+            "sram_size": 134217,
             "sram_width": 128,
 
-            "_comment2": "Vector config. total bit: 32 * 8 * 128 = 32,768",
             "process_bit": 32,
             "vector_core_width": 128,
-            "_comment3": "div and mac were eliminated",
             "add_latency": 1,
             "mul_latency": 1,
             "exp_latency": 1,
