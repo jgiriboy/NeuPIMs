@@ -565,7 +565,7 @@ uint64_t AddressConfig::encode_pim_comps_readres(int ch, int row, int num_comps,
 
     return make_address(ch, rank, bankgroup, bank, row, col);
 }
-
+// [TODO]
 // used for sub-batch interleaving
 std::string stageToString(Stage stage) {
     static const std::map<Stage, std::string> stageMap = {

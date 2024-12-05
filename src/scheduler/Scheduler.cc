@@ -243,9 +243,13 @@ void Scheduler::allocate_requests() {
 
 void Scheduler::make_program() {
     std::shared_ptr<BatchedRequest> sub_batch_on_sa;
+    // [TODO] std::shared_ptr<BatchedRequest> sub_batch_on_sa_2;
     std::shared_ptr<BatchedRequest> sub_batch_on_pim;
     /*
         [TODO]
+        1. _breq3
+        2. _stage : much more stages...
+        3. sophisticated conditional statement
     */
     if (static_cast<int>(_stage) % 2 == 0) {
         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
@@ -262,6 +266,9 @@ void Scheduler::make_program() {
         std::make_unique<StageProgram>(_model, sub_batch_on_sa, StagePlatform::SA, _stage);
     _model_program2 =
         std::make_unique<StageProgram>(_model, sub_batch_on_pim, StagePlatform::PIM, _stage);
+    //_model_program3 =
+    //    std::make_unique<StageProgram>(_model, sub_batch_on_sa_2, StagePlatform::SA, _stage);
+
 
     refresh_status1();
     refresh_status2();
@@ -372,7 +379,7 @@ void Scheduler::group_sub_batches() {
             // latency_queue.size());
         }
     }
-
+    // [TODO] + _breq3.size()
     spdlog::info("total batch_size: {}", _breq1.size() + _breq2.size());
 }
 
@@ -393,6 +400,7 @@ void Scheduler::cycle() {
     _cycles++;
 
     if (_config.sub_batch_mode) {
+        // [TODO] _model_program3 == nullptr && _breq3.size() > 0
         bool lets_make_program1 = _model_program1 == nullptr && _breq1.size() > 0;
         bool lets_make_program2 = _model_program2 == nullptr && _breq2.size() > 0;
 

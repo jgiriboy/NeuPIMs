@@ -93,6 +93,7 @@ void SimpleInterconnect::cycle() {
                     }
                     assert(mem_req->stage_platform == StagePlatform::SA ||
                            mem_req->stage_platform == StagePlatform::PIM);
+                    // [TODO]
                     if (mem_req->stage_platform == StagePlatform::SA)
                         _mem_req_queue1[mem_ch].push(mem_req);
                     else if (mem_req->stage_platform == StagePlatform::PIM)

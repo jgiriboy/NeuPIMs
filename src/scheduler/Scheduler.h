@@ -48,6 +48,7 @@ class Scheduler {
     const cycle_type *_core_cycle;
     Ptr<Model> _model;
 
+    // [TODO]
     std::unique_ptr<StageProgram> _model_program1;
     std::unique_ptr<StageProgram> _model_program2;
     std::deque<Tile> _executable_tile_queue1;
@@ -75,8 +76,10 @@ class Scheduler {
     uint32_t _max_batch_size;
     uint32_t _max_active_reqs;
 
+
     std::vector<Ptr<InferRequest>> _breq1;
     std::vector<Ptr<InferRequest>> _breq2;
+    // [TODO] std::vector<Ptr<InferRequest>> _breq3;
 
     // channel load balancing
     bool _ch_load_balancing;

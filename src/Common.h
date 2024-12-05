@@ -289,6 +289,7 @@ MemoryAccess *TransToMemoryAccess(Instruction &inst, uint32_t size, uint32_t cor
 int LogBase2(int power_of_two);
 
 // for Sub-batch interleaving
+// [TODO] more Stages
 enum class Stage { A, B, C, D, E, F, Finish };
 enum class StagePlatform { SA, PIM, SIZE };
 std::string stageToString(Stage stage);
