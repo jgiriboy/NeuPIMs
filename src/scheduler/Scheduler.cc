@@ -1,6 +1,7 @@
 #include "Scheduler.h"
 
 #include <cmath>
+#include <cstddef>
 
 #include "../tensor/NPUTensor.h"
 #include "../tensor/PIMTensor.h"
@@ -321,7 +322,7 @@ void Scheduler::group_sub_batches() {
                 This code snippet is Algorithm 3 in the paper.
                 We need to fix this part to group triple-batches.
             */
-            size_t sb1_size = req_queue.size() / 2;
+            std::size_t sb1_size = req_queue.size() / 2;
 
             if (req_queue.size() % 2 != 0) {
                 if (ceil_turn)
@@ -757,7 +758,7 @@ uint32_t Scheduler::count_active_operations() { return _active_operation_stats.s
 
 std::pair<std::vector<int>, std::vector<int>> Scheduler::partition_lists_simple(
     std::vector<uint32_t> originalVector) {
-    size_t midpointIndex = originalVector.size() / 2;
+    std::size_t midpointIndex = originalVector.size() / 2;
 
     std::vector<int> empty_vector;
     // Check if the vector is not empty

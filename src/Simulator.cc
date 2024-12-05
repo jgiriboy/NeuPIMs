@@ -134,6 +134,7 @@ void Simulator::cycle() {
             if (_scheduler->has_stage_changed()) {
                 _scheduler->reset_has_stage_changed_status();
                 // _icnt->log(_scheduler->get_prev_stage());
+            // [TODO] START FROM HERE
                 update_stage_stat();
             }
             _scheduler->cycle();
