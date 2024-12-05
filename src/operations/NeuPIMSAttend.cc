@@ -87,16 +87,16 @@ Tile NeuPIMSAttend::initialize_instructions(int start, int end) {
             // spdlog::info("value dim:{}", value->get_dims());
             assert(logit->get_dims()[1] == seq_len);
 
-            for (int h_idx = 0; h_idx < _nh; h_idx++) {
+            for (uint32_t h_idx = 0; h_idx < _nh; h_idx++) {
                 std::vector<addr_type> dram_logit_addrs;
                 std::vector<addr_type> dram_value_addrs;
 
-                for (int dk_idx = 0; dk_idx < _dk; dk_idx++) {
-                    for (int seq_idx = 0; seq_idx < seq_len; seq_idx++) {
+                for (uint32_t dk_idx = 0; dk_idx < _dk; dk_idx++) {
+                    for (uint32_t seq_idx = 0; seq_idx < seq_len; seq_idx++) {
                         dram_value_addrs.push_back(
                             value->get_addr(std::vector<uint32_t>{h_idx, seq_idx, dk_idx}));
 
-                        for (int sseq_idx = 0; sseq_idx < seq_len; sseq_idx++) {
+                        for (uint32_t sseq_idx = 0; sseq_idx < seq_len; sseq_idx++) {
                             dram_logit_addrs.push_back(logit->get_addr({h_idx, seq_idx, sseq_idx}));
                         }
                     }

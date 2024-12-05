@@ -73,7 +73,8 @@ struct SimulationConfig {
     // uint32_t core_width;  // TODO: remove
     // uint32_t core_height; // TODO: remove
 
-    uint32_t n_tp;
+    uint32_t n_tp; // Tensor parallelism: 2
+    // Pipeline parallelism: 1
 
     // uint32_t vector_core_count; // TODO: remove
     // uint32_t vector_core_width; // TODO: remove

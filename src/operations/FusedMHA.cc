@@ -97,8 +97,8 @@ void FusedMHA::initialize_instructions(Tile &tile, int req_idx, int head_idx, in
     // req_idx in batch
     // head_idx # start idx
     // num_heads
-    int q_len = _query[req_idx]->get_dims()[1];
-    int seq_len = _key[req_idx]->get_dims()[2];
+    uint32_t q_len = _query[req_idx]->get_dims()[1];
+    uint32_t seq_len = _key[req_idx]->get_dims()[2];
 
     addr_type sram_query_base = SPAD_BASE;
     addr_type sram_key_base = sram_query_base + q_len * _dk * num_heads * _config.precision;
@@ -108,7 +108,7 @@ void FusedMHA::initialize_instructions(Tile &tile, int req_idx, int head_idx, in
         sram_logit_base + q_len * seq_len * num_heads * _config.precision;
 
     for (int h_ofs = 0; h_ofs < num_heads; h_ofs++) {
-        int h_idx = head_idx + h_ofs;
+        uint32_t h_idx = head_idx + h_ofs;
 
         addr_type sram_q_ofs = sram_query_base + h_ofs * (q_len * _dk) * _config.precision;
         addr_type sram_k_ofs = sram_key_base + h_ofs * (_dk * seq_len) * _config.precision;
@@ -120,8 +120,8 @@ void FusedMHA::initialize_instructions(Tile &tile, int req_idx, int head_idx, in
         std::vector<addr_type> dram_key_addrs;    // = _key[req_idx]->get_all_addrs();
         std::vector<addr_type> dram_value_addrs;
 
-        for (int i = 0; i < _dk; i++) {
-            for (int seq_idx = 0; seq_idx < seq_len; seq_idx++) {
+        for (uint32_t i = 0; i < _dk; i++) {
+            for (uint32_t seq_idx = 0; seq_idx < seq_len; seq_idx++) {
                 // key:  h, d_k, seq_len
                 dram_key_addrs.push_back(
                     _key[req_idx]->get_addr(std::vector<uint32_t>{h_idx, i, seq_idx}));
