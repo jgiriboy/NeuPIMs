@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector>
-
+#include <stdexcept> // if not included before, needed for runtime_error
 #include "BatchedRequest.h"
 #include "Common.h"
 #include "Logger.h"
@@ -9,6 +9,12 @@
 #include "Stat.h"
 #include "operations/Operation.h"
 #include "tensor/BTensor.h"
+
+enum class StageType {
+    INIT,
+    DEFAULT_LOOP,
+    END_LOOP
+};
 
 class StageProgram {
    public:
@@ -31,17 +37,12 @@ class StageProgram {
 
     std::string _name;
 
-    // todo: from BatchedRequest
     std::shared_ptr<Model> _model;
     std::shared_ptr<BatchedRequest> _breq;
     robin_hood::unordered_map<uint32_t, Ptr<Operation>> _op_map;
-
-    // todo: Constructor
-    // std::map<uint32_t, Ptr<Operation>> _operation_map;
     std::map<uint32_t, Ptr<BTensor>> _tensor_map;
     std::vector<std::shared_ptr<Operation>> _executable_operations;
 
-    // Sub-batch interleaving
     StagePlatform _stage_platform;
     Stage _stage;
 
@@ -52,7 +53,9 @@ class StageProgram {
     bool enable_qkv_gen();
     bool skip_pim_stage();
 
-    // Layer Block
+    // Add the declaration of the new function and enum usage
+    StageType get_stage_type();
+
     std::vector<Ptr<BTensor>> projection_block(std::vector<Ptr<BTensor>> inputs);
     std::vector<Ptr<BTensor>> ffn1_block(std::vector<Ptr<BTensor>> inputs);
     std::vector<Ptr<BTensor>> ffn2_block(std::vector<Ptr<BTensor>> inputs);

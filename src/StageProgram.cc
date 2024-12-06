@@ -24,11 +24,48 @@ StageProgram::StageProgram(Ptr<Model> model, Ptr<BatchedRequest> batched_request
     this->init_program();
 }
 
+////////////////////////////////////////////////////////////////
+// Types of stages are classified into: init, default loop, end
+
+// (original) Sub-batch Scheduling
+// #1 stands for Sub-batch 2k-1
+// #2 stands for Sub-batch 2k
+
+// |     |        init         |            default loop             |          end          |
 // |     |     A    |     B    |         C        |         D        |     E     |     F     |
 // |-----|:--------:|:--------:|:----------------:|:----------------:|:---------:|:---------:|
 // |  SA | QKVgen#1 | QKVgen#2 | Pj/FFNs/QKVgen#1 | Pj/FFNs/QKVgen#2 | Pj/FFNs#1 | Pj/FFNs#2 |
 // | PIM |     -    |  MHA#1   | MHA#2            | MHA#1            |   MHA#2   |     -     |
-//
+
+// (new) Three-batch Scheduling
+// MHA consist of logit_softmax + attend Stage
+// We divided this MHA stage into logit_softmax and attend stage
+// #1 stands for Sub-batch 3k-2
+// #2 stands for Sub-batch 3k-1
+// #3 stands for Sub-batch 3k
+
+// |     |                                  init (5 stages)                                         | 
+// |     |     A    |        B        |        C        |          D          |          E          |
+// |-----|:--------:|:---------------:|:---------------:|:-------------------:|:-------------------:|
+// | SA1 | QKVgen#1 |    QKVgen#2     |    QKVgen#3     |        Pj#1         |          -          |
+// | SA2 |     -    |        -        |        -        |          -          |       FFN1s#1       |
+// | PIM |     -    | logit_softmax#1 |    attend#1     | logit_softmax#2     |      attend#2       |
+
+// |     |                               default loop (6 stages)                                                     | 
+// |     |        F        |        G        |        H        |       I         |        J        |         K       |
+// |-----|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|
+// | SA1 |      Pj#2       |    QKVgen#1     |       Pj#3      |     QKVgen#2    |       Pj#1      |    QKVgen#3     |
+// | SA2 |    FFN2s#1      |    FFN1s#2      |      FFN2s#2    |    FFN1s#3      |    FFN2s#3      |    FFN1s#1      |
+// | PIM | logit_softmax#3 |    attend#3     | logit_softmax#1 |    attend#1     | logit_softmax#2 |    attend#2     |
+
+// |     |                                  end loop (6 stages)                                    | 
+// |     |        L        |        M        |        N        |       O         |        P        |
+// |-----|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|
+// | SA1 |      Pj#2       |        -        |       Pj#3      |        -        |        -        |
+// | SA2 |    FFN2s#1      |    FFN1s#2      |    FFN2s#2      |    FFN1s#3      |    FFN2s#3      |
+// | PIM | logit_softmax#3 |    attend#3     |        -        |        -        |        -        |
+
+
 void StageProgram::init_program() {
     assert(_stage != Stage::Finish);
 
@@ -51,15 +88,59 @@ void StageProgram::init_program() {
         init_SA_program();
 }
 
-bool StageProgram::skip_pim_stage() { return _stage == Stage::A || _stage == Stage::F; }
+//////////////////////////////////////
+// #1. Stage-related Condition Checks
+//////////////////////////////////////
+
+// Check if the stagetype is INIT or DEFAULT_LOOP or END_LOOP
+StageType StageProgram::get_stage_type() {
+    switch (_stage) {
+        case Stage::A:
+        case Stage::B:
+        case Stage::C:
+        case Stage::D:
+        case Stage::E:
+            return StageType::INIT;
+
+        case Stage::F:
+        case Stage::G:
+        case Stage::H:
+        case Stage::I:
+        case Stage::J:
+        case Stage::K:
+            return StageType::DEFAULT_LOOP;
+
+        case Stage::L:
+        case Stage::M:
+        case Stage::N:
+        case Stage::O:
+        case Stage::P:
+            return StageType::END_LOOP;
+
+        default:
+            throw std::runtime_error("Unknown stage type");
+    }
+}
+
+// Refactored Conditional Functions
+bool StageProgram::skip_pim_stage() {
+    StageType stage_type = get_stage_type();
+    return (stage_type == StageType::INIT && (_stage == Stage::A || _stage == Stage::E)) ||
+           (stage_type == StageType::END_LOOP && _stage == Stage::P);
+}
 
 bool StageProgram::enable_proj_ffns() {
-    return _stage == Stage::C || _stage == Stage::D || _stage == Stage::E || _stage == Stage::F;
+    StageType stage_type = get_stage_type();
+    return (stage_type == StageType::INIT && (_stage == Stage::C || _stage == Stage::D || _stage == Stage::E)) ||
+           (stage_type == StageType::DEFAULT_LOOP);
 }
 
 bool StageProgram::enable_qkv_gen() {
-    return _stage == Stage::A || _stage == Stage::B || _stage == Stage::C || _stage == Stage::D;
+    StageType stage_type = get_stage_type();
+    return (stage_type == StageType::INIT && (_stage == Stage::A || _stage == Stage::B || _stage == Stage::C || _stage == Stage::D || _stage == Stage::E)) ||
+           (stage_type == StageType::DEFAULT_LOOP && (_stage == Stage::F || _stage == Stage::I || _stage == Stage::J));
 }
+
 
 void StageProgram::init_SA_program() {
     spdlog::info(">>> Initialize SystolicArray Stage Model Program <<<");
@@ -253,6 +334,11 @@ std::vector<Ptr<BTensor>> StageProgram::projection_block(std::vector<Ptr<BTensor
     inputs = get_outputs(residual, inputs);
     return inputs;
 }
+// (original) ffn1_block includes ffn2
+// I want to separate ffn1_block into ffn1_block and ffn2_block
+// ffn1_block(original): LayerNorm -> MatMul(fc1) -> Gelu -> MatMul(fc2) -> Add
+// ffn1_block(new): FFN1 (LayerNorm -> MatMul(fc1) -> Gelu)
+// ffn2_block(new): FFN2 (FFN1-> MatMul(fc2) -> Add)
 std::vector<Ptr<BTensor>> StageProgram::ffn1_block(std::vector<Ptr<BTensor>> inputs) {
     int layer = 0;
     auto res_buf = inputs[0];
