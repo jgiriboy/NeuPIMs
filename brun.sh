@@ -19,7 +19,8 @@ CONFIG_FILE=${LOG_DIR}/config.log
 
 echo "log directory: $LOG_DIR"
 
-
+# start: 7585bcead2ce0d8179a2449e32884cb990698c12
+# end: 11fc767364f0bccdb2714bb50daa75e4ce1011f0
 
 ./build/bin/Simulator \
     --config $config \

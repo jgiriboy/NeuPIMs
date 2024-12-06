@@ -67,8 +67,11 @@ pipeline parallelism in attention is applied to column(QKVgen, fc1) and row(proj
 need for layernorm variable to be at all chip
 */
 void Model::init_params() {
+    // config.model_n_layer = 1;
     for (int i = 0; i < _config.model_n_layer; ++i) {
-        auto attn = name_gen(LAYER(i), BlockType::Attention);
+        auto attn = name_gen(LAYER(i), BlockType::Attention); // layer0.attn
+        
+        // layer0.attn.ln
         create_weight(name_gen(attn, OperationType::LayerNorm, ParameterType::Weight),
                       {_config.model_n_embd});
         create_weight(name_gen(attn, OperationType::LayerNorm, ParameterType::Bias),

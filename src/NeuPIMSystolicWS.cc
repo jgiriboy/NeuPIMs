@@ -551,7 +551,7 @@ void NeuPIMSystolicWS::pim_issue_ex_inst(Instruction inst) {
             if (inst.opcode == Opcode::GEMM_PRELOAD) {
                 // State mul-pre
                 parent_tile->stat.weight_load_cycles += _config.core_config[_id].core_height;
-                offset = MAX(offset, _config.core_config[_id].core_height);
+                offset = _config.core_config[_id].core_height;
             }
             inst.start_cycle = _compute_pipeline.back().start_cycle + offset;
         } else {
