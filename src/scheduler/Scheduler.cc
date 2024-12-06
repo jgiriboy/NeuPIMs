@@ -28,6 +28,9 @@ Scheduler::Scheduler(SimulationConfig config, const cycle_type* core_cycle)
     // 2: PIM Program
     _model_program1 = nullptr;
     _model_program2 = nullptr;
+    #ifdef TRI
+    _model_program3 = nullptr;
+    #endif
 
     _init_stage = Stage::A;
     // _init_stage = Stage::C;
@@ -242,16 +245,67 @@ void Scheduler::allocate_requests() {
     // exit(-1);
 }
 
+//[TODO]
 void Scheduler::make_program() {
     std::shared_ptr<BatchedRequest> sub_batch_on_sa;
-    // [TODO] std::shared_ptr<BatchedRequest> sub_batch_on_sa_2;
     std::shared_ptr<BatchedRequest> sub_batch_on_pim;
-    /*
-        [TODO]
-        1. _breq3
-        2. _stage : much more stages...
-        3. sophisticated conditional statement
-    */
+    #ifdef TRI
+    std::shared_ptr<BatchedRequest> sub_batch_on_sa_2;
+    #endif
+    #ifdef TRI
+    switch(_stage)
+    {
+        case Stage::F:
+            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
+            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq2);
+            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq3);
+            break;
+        case Stage::G:
+            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);
+            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
+            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq3);
+            break;
+        case Stage::H:
+            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);
+            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq3);
+            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq1);
+            break;
+        case Stage::I:
+            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq3);
+            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq2);
+            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq1);
+            break;
+        case Stage::J:
+            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq3);
+            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
+            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
+            break;
+        case Stage::K:
+            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
+            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq3);
+            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
+            break;
+        default:
+            assert(0 && "Invalid stage");
+            break;
+    }
+
+    spdlog::info("New Program for SA  (sub-batch.size: {})", sub_batch_on_sa->_reqs.size());
+    spdlog::info("New Program for SA2  (sub-batch.size: {})", sub_batch_on_sa_2->_reqs.size());
+    spdlog::info("New Program for PIM (sub-batch.size: {})", sub_batch_on_pim->_reqs.size());
+
+    _model_program1 =
+        std::make_unique<StageProgram>(_model, sub_batch_on_sa, StagePlatform::SA, _stage);
+    _model_program2 =
+        std::make_unique<StageProgram>(_model, sub_batch_on_pim, StagePlatform::PIM, _stage);
+    _model_program3 =
+        std::make_unique<StageProgram>(_model, sub_batch_on_sa_2, StagePlatform::SA2, _stage);
+
+    refresh_status1();
+    refresh_status2();
+    refresh_status3();
+    #else
+
     if (static_cast<int>(_stage) % 2 == 0) {
         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
@@ -263,6 +317,7 @@ void Scheduler::make_program() {
     spdlog::info("New Program for SA  (sub-batch.size: {})", sub_batch_on_sa->_reqs.size());
     spdlog::info("New Program for PIM (sub-batch.size: {})", sub_batch_on_pim->_reqs.size());
 
+    // [E] These part prints yellow color in the terminal
     _model_program1 =
         std::make_unique<StageProgram>(_model, sub_batch_on_sa, StagePlatform::SA, _stage);
     _model_program2 =
@@ -273,6 +328,8 @@ void Scheduler::make_program() {
 
     refresh_status1();
     refresh_status2();
+    
+    #endif
 }
 
 int Scheduler::estimate_mha_latency(Ptr<InferRequest> request) {
@@ -296,32 +353,92 @@ int Scheduler::estimate_mha_latency(Ptr<InferRequest> request) {
 }
 
 void Scheduler::group_sub_batches() {
-    if (!_config.sub_batch_mode) {
-        //>>>
-        // Consolidate to one batch
-        for (int ch = 0; ch < _dram_channels; ch++) {
-            auto req_queue = _active_request_queues[ch];
-            for (auto it = req_queue.begin(); it != req_queue.end(); it++) {
-                Ptr<InferRequest> request = *it;
-                _breq1.push_back(request);
-            }
-        }
-        return;
-        //<<<
-    }
+    // if (!_config.sub_batch_mode) {
+    //     //>>>
+    //     // Consolidate to one batch
+    //     for (int ch = 0; ch < _dram_channels; ch++) {
+    //         auto req_queue = _active_request_queues[ch];
+    //         for (auto it = req_queue.begin(); it != req_queue.end(); it++) {
+    //             Ptr<InferRequest> request = *it;
+    //             _breq1.push_back(request);
+    //         }
+    //     }
+    //     return;
+    //     //<<<
+    // }
+    assert(_config.sub_batch_mode);
+    assert(_partition_alg_simple);
 
     bool ceil_turn = true;
+    char bitmask = 0b00000000;
     for (int ch = 0; ch < _dram_channels; ch++) {
         auto req_queue = _active_request_queues[ch];
         auto latency_queue = _active_request_latency_queues[ch];
         assert(req_queue.size() == latency_queue.size());
-
+        
         if (_partition_alg_simple) {
-            
-            /* [TODO]
-                This code snippet is Algorithm 3 in the paper.
-                We need to fix this part to group triple-batches.
-            */
+
+            #ifdef TRI
+
+            std::size_t sb1_size = req_queue.size() / 3;
+            std::size_t sb2_size = req_queue.size() / 3 * 2;
+            std::size_t remainder = req_queue.size() % 3;
+
+            if (req_queue.size() % 3 != 0) {
+                switch(bitmask) {
+                    case 0b00000000:
+                        sb1_size = (req_queue.size() / 3) + 1;
+                        sb2_size = (remainder==1) ? sb1_size + (req_queue.size() / 3) : sb1_size + (req_queue.size() / 3) + 1;
+                        bitmask  = (remainder==1) ? 0b00000001 : 0b00000011;
+                        break;   
+                    case 0b00000001:
+                        sb1_size = req_queue.size() / 3;
+                        sb2_size = sb1_size + (req_queue.size() / 3) + 1;
+                        bitmask  = (remainder==1) ? 0b00000011 : 0b00000000;
+                        break;
+                    case 0b00000010:
+                        sb1_size = (req_queue.size() / 3) + 1;
+                        sb2_size = sb1_size + (req_queue.size() / 3);
+                        bitmask  = (remainder==1) ? 0b00000011 : 0b00000000;
+                        break;
+                    case 0b00000100:
+                        sb1_size = (req_queue.size() / 3) + 1;
+                        sb2_size = (remainder==1) ? sb1_size + (req_queue.size() / 3) : sb1_size + (req_queue.size() / 3) + 1;
+                        bitmask  = (remainder==1) ? 0b00000101 : 0b00000000;
+                        break;
+                    case 0b00000011:
+                        sb1_size = (remainder==1) ? req_queue.size() / 3 : (req_queue.size() / 3) + 1;
+                        sb2_size = sb1_size + (req_queue.size() / 3);
+                        bitmask  = (remainder==1) ? 0b00000000 : 0b00000001;
+                        break;
+                    case 0b00000101:
+                        sb1_size = (remainder==1) ? req_queue.size() / 3 : (req_queue.size() / 3) + 1;
+                        sb2_size = sb1_size + (req_queue.size() / 3) + 1;
+                        bitmask  = (remainder==1) ? 0b00000000 : 0b00000001;
+                        break;
+                    case 0b00000110:
+                        sb1_size = (remainder==1) ? (req_queue.size() / 3) + 1 : (req_queue.size() / 3) + 2;
+                        sb2_size = sb1_size + (req_queue.size() / 3);
+                        bitmask  = (remainder==1) ? 0b00000000 : 0b00000001;
+                        break;
+                    default:
+                        assert(0 && "Invalid bitmask");
+                        break;
+                }
+            }
+
+            for (int i = 0; i < req_queue.size(); i++) {
+                Ptr<InferRequest> request = req_queue[i];
+                if (i < sb1_size)
+                    _breq1.push_back(request);
+                else if(i < sb2_size)
+                    _breq2.push_back(request);
+                else
+                    _breq3.push_back(request);
+            }
+
+            #else
+
             std::size_t sb1_size = req_queue.size() / 2;
 
             if (req_queue.size() % 2 != 0) {
@@ -334,9 +451,6 @@ void Scheduler::group_sub_batches() {
             }
 
             for (int i = 0; i < req_queue.size(); i++) {
-                /*
-                    [TODO]
-                */
                 Ptr<InferRequest> request = req_queue[i];
                 if (i < sb1_size)
                     _breq1.push_back(request);
@@ -344,44 +458,49 @@ void Scheduler::group_sub_batches() {
                     _breq2.push_back(request);
             }
 
-        } else {
-            auto index_lists = partition_lists_dp(latency_queue);
-            std::vector<int> list1 = index_lists.first;
-            std::vector<int> list2 = index_lists.second;
+            #endif
 
-            int sum_list1_latencies = 0;
-            int sum_list2_latencies = 0;
-            std::string list1_str = "";
-            std::string list2_str = "";
-            std::string time1_str = "";
-            std::string time2_str = "";
-            for (auto it = list1.begin(); it != list1.end(); it++) {
-                int req_id = *it;
-                Ptr<InferRequest> request = req_queue[req_id];
-                sum_list1_latencies += latency_queue[req_id];
-                _breq1.push_back(request);
-                list1_str += std::to_string(req_id) + ", ";
-                time1_str += std::to_string(latency_queue[req_id]) + ", ";
-            }
-            for (auto it = list2.begin(); it != list2.end(); it++) {
-                int req_id = *it;
-                Ptr<InferRequest> request = req_queue[req_id];
-                sum_list2_latencies += latency_queue[req_id];
-                _breq2.push_back(request);
-                list2_str += std::to_string(req_id) + ", ";
-                time2_str += std::to_string(latency_queue[req_id]) + ", ";
-            }
-            // spdlog::info("====Channel {}====", ch);
-            // spdlog::info("#1 sum:{:2d}, idx:[{}], time:[{}]", sum_list1_latencies, list1_str,
-            //              time1_str);
-            // spdlog::info("#2 sum:{:2d}, idx:[{}], time:[{}]", sum_list2_latencies, list2_str,
-            //              time2_str);
-            // spdlog::info("req_q.size:{}, latency_q.size:{}", req_queue.size(),
-            // latency_queue.size());
+        // } else {
+        //     auto index_lists = partition_lists_dp(latency_queue);
+        //     std::vector<int> list1 = index_lists.first;
+        //     std::vector<int> list2 = index_lists.second;
+
+        //     int sum_list1_latencies = 0;
+        //     int sum_list2_latencies = 0;
+        //     std::string list1_str = "";
+        //     std::string list2_str = "";
+        //     std::string time1_str = "";
+        //     std::string time2_str = "";
+        //     for (auto it = list1.begin(); it != list1.end(); it++) {
+        //         int req_id = *it;
+        //         Ptr<InferRequest> request = req_queue[req_id];
+        //         sum_list1_latencies += latency_queue[req_id];
+        //         _breq1.push_back(request);
+        //         list1_str += std::to_string(req_id) + ", ";
+        //         time1_str += std::to_string(latency_queue[req_id]) + ", ";
+        //     }
+        //     for (auto it = list2.begin(); it != list2.end(); it++) {
+        //         int req_id = *it;
+        //         Ptr<InferRequest> request = req_queue[req_id];
+        //         sum_list2_latencies += latency_queue[req_id];
+        //         _breq2.push_back(request);
+        //         list2_str += std::to_string(req_id) + ", ";
+        //         time2_str += std::to_string(latency_queue[req_id]) + ", ";
+        //     }
+        //     // spdlog::info("====Channel {}====", ch);
+        //     // spdlog::info("#1 sum:{:2d}, idx:[{}], time:[{}]", sum_list1_latencies, list1_str,
+        //     //              time1_str);
+        //     // spdlog::info("#2 sum:{:2d}, idx:[{}], time:[{}]", sum_list2_latencies, list2_str,
+        //     //              time2_str);
+        //     // spdlog::info("req_q.size:{}, latency_q.size:{}", req_queue.size(),
+        //     // latency_queue.size());
         }
     }
-    // [TODO] + _breq3.size()
+    #ifdef TRI
+    spdlog::info("total batch_size: {}", _breq1.size() + _breq2.size() + _breq3.size());
+    #else
     spdlog::info("total batch_size: {}", _breq1.size() + _breq2.size());
+    #endif
 }
 
 // Called exactly once
@@ -391,7 +510,11 @@ void Scheduler::init_batches() {
 }
 
 void Scheduler::cycle() {
+    #ifdef TRI
+    bool step_next_stage = _model_program1 == nullptr && _model_program2 == nullptr && _model_program3 == nullptr;
+    #else
     bool step_next_stage = _model_program1 == nullptr && _model_program2 == nullptr;
+    #endif
 
     if (step_next_stage && _stage == _init_stage && !_request_queue.empty()) {
         init_batches();
@@ -399,17 +522,34 @@ void Scheduler::cycle() {
     }
 
     _cycles++;
-
+    assert(_config.sub_batch_mode);
     if (_config.sub_batch_mode) {
-        // [TODO] _model_program3 == nullptr && _breq3.size() > 0
         bool lets_make_program1 = _model_program1 == nullptr && _breq1.size() > 0;
         bool lets_make_program2 = _model_program2 == nullptr && _breq2.size() > 0;
+        #ifdef TRI
+        bool lets_make_program3 = _model_program3 == nullptr && _breq3.size() > 0;
+        #endif
 
+        #ifdef TRI
+        if (lets_make_program1 && lets_make_program2 && lets_make_program3) {
+            if (_stage == Stage::Finish) {
+                cleanup_sub_batch(_breq1);
+                cleanup_sub_batch(_breq2);
+                cleanup_sub_batch(_breq3);
+                _breq1.clear();
+                _breq2.clear();
+                _breq3.clear();
+                return;
+            } else {
+                std::string red = "\033[1;31m";
+                std::string reset = "\033[0m";
+                spdlog::info("{}----------Stage {}----------{}", red, stageToString(_stage), reset);
+                make_program();
+            }
+        }
+        #else
         if (lets_make_program1 && lets_make_program2) {
             if (_stage == Stage::Finish) {
-                /*
-                    [TODO]
-                */
                 cleanup_sub_batch(_breq1);
                 cleanup_sub_batch(_breq2);
                 _breq1.clear();
@@ -422,27 +562,26 @@ void Scheduler::cycle() {
                 make_program();
             }
         }
-    } else {
-        bool both_program_none = _model_program1 == nullptr && _model_program2 == nullptr;
-        bool exist_request = _breq2.size() > 0 || _breq1.size() > 0;
-        if (both_program_none && exist_request) {
-            if (_stage == Stage::Finish) {
-                /*
-                    [TODO]
-                */
-                cleanup_sub_batch(_breq1);
-                cleanup_sub_batch(_breq2);
-                _breq1.clear();
-                _breq2.clear();
-                return;
-            } else {
-                std::string red = "\033[1;31m";
-                std::string reset = "\033[0m";
-                spdlog::info("{}----------Stage {}----------{}", red, stageToString(_stage), reset);
-                make_program();
-            }
-        }
-    }
+        #endif
+    } 
+    // else {
+    //     bool both_program_none = _model_program1 == nullptr && _model_program2 == nullptr;
+    //     bool exist_request = _breq2.size() > 0 || _breq1.size() > 0;
+    //     if (both_program_none && exist_request) {
+    //         if (_stage == Stage::Finish) {
+    //             cleanup_sub_batch(_breq1);
+    //             cleanup_sub_batch(_breq2);
+    //             _breq1.clear();
+    //             _breq2.clear();
+    //             return;
+    //         } else {
+    //             std::string red = "\033[1;31m";
+    //             std::string reset = "\033[0m";
+    //             spdlog::info("{}----------Stage {}----------{}", red, stageToString(_stage), reset);
+    //             make_program();
+    //         }
+    //     }
+    // }
 }
 
 void Scheduler::add_request(std::shared_ptr<InferRequest> request) {
@@ -488,6 +627,24 @@ Tile& Scheduler::top_tile2(uint32_t core_id) {
     }
 }
 
+// [TODO]
+#ifdef TRI
+Tile& Scheduler::top_tile3(uint32_t core_id) {
+    static Tile empty_tile = Tile{.status = Tile::Status::EMPTY};
+    if (_executable_tile_queue3.empty()) {
+        return empty_tile;
+    } else {
+        Tile& tile = _executable_tile_queue3.front();
+        if (tile.status == Tile::Status::BAR) {
+            return empty_tile;
+        } else {
+            tile.stage_platform = StagePlatform::SA2;
+            return tile;
+        }
+    }
+}
+#endif
+
 // ??: Add base address for each addr in tiles / XXX: < necessary comment?
 // ??: something wrong with functionality. seems it's not a necessary function
 void Scheduler::get_tile1(uint32_t core_id) {
@@ -513,6 +670,7 @@ void Scheduler::get_tile1(uint32_t core_id) {
         }
     }
 }
+
 void Scheduler::get_tile2(uint32_t core_id) {
     if (_executable_tile_queue2.empty()) {
         return;
@@ -537,9 +695,37 @@ void Scheduler::get_tile2(uint32_t core_id) {
     }
 }
 
+// [TODO]
+#ifdef TRI
+void Scheduler::get_tile3(uint32_t core_id) {
+    if (_executable_tile_queue3.empty()) {
+        return;
+    } else {
+        Tile& tile = _executable_tile_queue3.front();
+        if (tile.status == Tile::Status::BAR) {
+            RunningOperationStat stat = _finished_operation_stats[tile.operation_id];
+            if (stat.launched_tiles + stat.remain_tiles == stat.total_tiles) {
+                /* POP only if all lauched tiles are finished */
+                _executable_tile_queue3.pop_front();
+                _finished_operation_stats[tile.operation_id].launched_tiles++;
+                _finished_operation_stats[tile.operation_id].remain_tiles--;
+            }
+            return;
+        } else {
+            _active_operation_stats[tile.operation_id].launched_tiles++;
+            _executable_tile_queue3.pop_front();
+            spdlog::debug("Operation {} Core {} Get Tile at {}", tile.optype, core_id,
+                          *_core_cycle);
+            return;
+        }
+    }
+}
+#endif
+
 //  update operation stat
 //  if operation is finished
 //      apply to _model_program & return true
+// [TODO]
 bool Scheduler::finish_tile(uint32_t core_id, Tile& tile) {
     bool result = false;
     spdlog::debug("Tile {} Core {} Finish Tile at {}", tile.operation_id, core_id, *_core_cycle);
@@ -549,12 +735,24 @@ bool Scheduler::finish_tile(uint32_t core_id, Tile& tile) {
     _active_operation_stats[tile.operation_id].remain_tiles--;
 
     spdlog::info("Finish tile stage_platform:{}", stagePlatformToString(tile.stage_platform));
-
+    #ifdef TRI
+    
+    if (tile.stage_platform == StagePlatform::SA)
+        _model_program1->finish_operation_tile(tile);
+    else if (tile.stage_platform == StagePlatform::PIM)
+        _model_program2->finish_operation_tile(tile);
+    else
+        _model_program3->finish_operation_tile(tile);
+    
+    #else
+    
     if (tile.stage_platform == StagePlatform::SA)
         _model_program1->finish_operation_tile(tile);
     else
         _model_program2->finish_operation_tile(tile);
-
+    
+    #endif
+    
     if (_active_operation_stats[tile.operation_id].remain_tiles == 0) {
         result = true;
         spdlog::info("Layer {} finish at {}", _active_operation_stats[tile.operation_id].name,
@@ -562,25 +760,55 @@ bool Scheduler::finish_tile(uint32_t core_id, Tile& tile) {
         spdlog::info("Total compute time {}",
                      *_core_cycle - _active_operation_stats[tile.operation_id].start_cycle);
 
+        #ifdef TRI
+
+        if (tile.stage_platform == StagePlatform::SA)
+            _model_program1->finish_operation(tile.operation_id);
+        else if (tile.stage_platform == StagePlatform::PIM)
+            _model_program2->finish_operation(tile.operation_id);
+        else 
+            _model_program3->finish_operation(tile.operation_id);
+
+        #else
+
         if (tile.stage_platform == StagePlatform::SA)
             _model_program1->finish_operation(tile.operation_id);
         else
             _model_program2->finish_operation(tile.operation_id);
 
+        #endif
         _finished_operation_stats[tile.operation_id] = _active_operation_stats[tile.operation_id];
         _active_operation_stats.erase(tile.operation_id);
     }
+
+
+    #ifdef TRI
+
+    if (tile.stage_platform == StagePlatform::SA)
+        refresh_status1();
+    else if (tile.stage_platform == StagePlatform::PIM)
+        refresh_status2();
+    else 
+        refresh_status3();
+
+    #else
 
     if (tile.stage_platform == StagePlatform::SA)
         refresh_status1();
     else
         refresh_status2();
 
+    #endif
+
     return result;
 }
 
+
 bool Scheduler::empty1() { return _model_program1 == nullptr; }
 bool Scheduler::empty2() { return _model_program2 == nullptr; }
+#ifdef TRI
+bool Scheduler::empty3() { return _model_program3 == nullptr; }
+#endif
 
 bool Scheduler::running() { return !_request_queue.empty() || !_completed_request_queue.empty(); }
 
@@ -620,7 +848,13 @@ void Scheduler::cleanup_sub_batch(std::vector<Ptr<InferRequest>> sub_batch) {
 }
 
 void Scheduler::refresh_stage() {
+    
+    #ifdef TRI
+    bool stage_done = _model_program1 == nullptr && _model_program2 == nullptr && _model_program3 == nullptr;
+    #else
     bool stage_done = _model_program1 == nullptr && _model_program2 == nullptr;
+    #endif
+    
     if (stage_done) {
         std::string red = "\033[1;31m";
         std::string reset = "\033[0m";
@@ -639,15 +873,17 @@ void Scheduler::refresh_stage() {
 
         _has_stage_changed = true;
 
-        if (!_config.sub_batch_mode) {
-            // >> newton
-            if (_stage == Stage::C) _stage = Stage::E;
-            if (_stage == Stage::F) _stage = Stage::Finish;
-            // << newton
-        }
+        assert(_config.sub_batch_mode);
+        // if (!_config.sub_batch_mode) {
+        //     // >> newton
+        //     if (_stage == Stage::C) _stage = Stage::E;
+        //     if (_stage == Stage::F) _stage = Stage::Finish;
+        //     // << newton
+        // }
         if (_just_one_stage) _stage = Stage::Finish;  // force to execute just one stage
     }
 }
+
 
 void Scheduler::finish_program1() {
     spdlog::info("Model finish at {}", *_core_cycle);
@@ -670,6 +906,19 @@ void Scheduler::finish_program2() {
     // cleanup_sub_batch(_breq2);
     // _breq2.clear();
 }
+
+#ifdef TRI
+void Scheduler::finish_program3() {
+    spdlog::info("Model finish at {}", *_core_cycle);
+    _model_program3->log();
+
+    _model_program3 = nullptr;
+    refresh_stage();
+
+    // cleanup_sub_batch(_breq2);
+    // _breq2.clear();
+}
+#endif
 
 void Scheduler::refresh_status1() {
     if (_model_program1 != nullptr) {
@@ -754,10 +1003,54 @@ void Scheduler::refresh_status2() {
     }
 }
 
+
+// [TODO]
+#ifdef TRI
+void Scheduler::refresh_status3() {
+    if (_model_program3 != nullptr) {
+        if (_model_program3->check_finish()) {
+            finish_program3();
+            // exit(0);
+        }
+    }
+    // initiate operation
+    // xxx is count_active_operations() == 0 necessary?
+    if (_model_program3 != nullptr && _executable_tile_queue3.empty()
+        //  && count_active_operations() == 0) {
+    ) {
+        // spdlog::info("executable operation count {}",
+        //              _model_program2->get_executable_operations().size());
+        auto op = _model_program3->get_executable_operations().front();
+        spdlog::info("Start operation {}", op->get_name());
+        if (count_active_operations()) {
+            if (_active_operation_stats.find(op->get_id()) != _active_operation_stats.end()) {
+                return;
+            }
+        }
+
+        assert(op->get_tiles().size());
+        _executable_tile_queue3 = op->get_tiles();
+        _active_operation_stats[op->get_id()] = RunningOperationStat{
+            .id = op->get_id(),
+            .name = op->get_name(),
+            // xxx necessary?
+            // .launched = true,
+            .start_cycle = *_core_cycle,
+            .total_tiles = (uint32_t)_executable_tile_queue3.size(),
+            .remain_tiles = (uint32_t)_executable_tile_queue3.size(),
+            .launched_tiles = 0,
+        };
+    }
+}
+#endif
+
 uint32_t Scheduler::count_active_operations() { return _active_operation_stats.size(); }
 
 std::pair<std::vector<int>, std::vector<int>> Scheduler::partition_lists_simple(
     std::vector<uint32_t> originalVector) {
+    
+    assert(0 && "Is this called?");
+    
     std::size_t midpointIndex = originalVector.size() / 2;
 
     std::vector<int> empty_vector;
@@ -784,6 +1077,9 @@ std::pair<std::vector<int>, std::vector<int>> Scheduler::partition_lists_simple(
 
 std::pair<std::vector<int>, std::vector<int>> Scheduler::partition_lists_dp(
     std::vector<uint32_t> inputList) {
+    
+    assert(0 && "Is this called, too?");
+    
     int totalSum = 0;
     for (int num : inputList) {
         totalSum += num;

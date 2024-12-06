@@ -109,7 +109,6 @@ void Simulator::log_stage_stat() {
 
     ofile.close();
 }
-
 void Simulator::cycle() {
     OpStat op_stat;
     ModelStat model_stat;
@@ -134,11 +133,10 @@ void Simulator::cycle() {
             if (_scheduler->has_stage_changed()) {
                 _scheduler->reset_has_stage_changed_status();
                 // _icnt->log(_scheduler->get_prev_stage());
-            // [TODO] START FROM HERE
                 update_stage_stat();
             }
             _scheduler->cycle();
-
+            // [TODO] START FROM HERE
             for (int core_id = 0; core_id < _n_cores; core_id++) {
                 auto finished_tile = _cores[core_id]->pop_finished_tile();
                 if (finished_tile == nullptr) {

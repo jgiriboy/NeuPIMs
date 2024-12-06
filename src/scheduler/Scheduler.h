@@ -12,11 +12,18 @@ class Scheduler {
     Tile &top_tile2(uint32_t core_id);
     void get_tile1(uint32_t core_id);
     void get_tile2(uint32_t core_id);
+    #ifdef TRI
+    Tile &top_tile3(uint32_t core_id);
+    void get_tile3(uint32_t core_id);
+    #endif
 
     bool finish_tile(uint32_t core_id, Tile &tile);
     bool empty1();
     bool empty2();
     bool running();
+    #ifdef TRI
+    bool empty3();
+    #endif
 
     void print_stat();
 
@@ -48,11 +55,14 @@ class Scheduler {
     const cycle_type *_core_cycle;
     Ptr<Model> _model;
 
-    // [TODO]
     std::unique_ptr<StageProgram> _model_program1;
     std::unique_ptr<StageProgram> _model_program2;
     std::deque<Tile> _executable_tile_queue1;
     std::deque<Tile> _executable_tile_queue2;
+    #ifdef TRI
+    std::unique_ptr<StageProgram> _model_program3;
+    std::deque<Tile> _executable_tile_queue3;
+    #endif
 
     SimulationConfig _config;
     // xxx necessary?
@@ -64,6 +74,9 @@ class Scheduler {
 
     virtual void refresh_status1();
     virtual void refresh_status2();
+    #ifdef TRI
+    void refresh_status3();
+    #endif
 
     uint32_t count_active_operations();
 
@@ -79,7 +92,9 @@ class Scheduler {
 
     std::vector<Ptr<InferRequest>> _breq1;
     std::vector<Ptr<InferRequest>> _breq2;
-    // [TODO] std::vector<Ptr<InferRequest>> _breq3;
+    #ifdef TRI
+    std::vector<Ptr<InferRequest>> _breq3;
+    #endif
 
     // channel load balancing
     bool _ch_load_balancing;
@@ -118,6 +133,9 @@ class Scheduler {
     void refresh_stage();
     void finish_program1();
     void finish_program2();
+    #ifdef TRI
+    void finish_program3();
+    #endif
 
     void cleanup_sub_batch(std::vector<Ptr<InferRequest>> sub_batch);
 

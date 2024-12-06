@@ -40,6 +40,7 @@
 #define ACCUM_SPAD_BASE 0x20000000
 #define GARBAGE_ADDR 0xFFFFFFFFFFFFFFF
 #define KB *1024
+// #define TRI
 
 #define PAGE_SIZE 4096
 
@@ -289,9 +290,17 @@ MemoryAccess *TransToMemoryAccess(Instruction &inst, uint32_t size, uint32_t cor
 int LogBase2(int power_of_two);
 
 // for Sub-batch interleaving
-// [TODO] more Stages
-enum class Stage { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Finish };
-enum class StagePlatform { SA1, SA2, PIM, SIZE }; // remove SA
+#ifdef TRI
+enum class Stage { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Finish};
+#else
+enum class Stage { A, B, C, D, E, F, Finish };
+#endif
+
+#ifdef TRI
+enum class StagePlatform { SASA, SA1, SA2, PIM, SIZE };
+#else
+enum class StagePlatform { SA, PIM, SIZE };
+#endif
 std::string stageToString(Stage stage);
 std::string stagePlatformToString(StagePlatform sp);
 //
