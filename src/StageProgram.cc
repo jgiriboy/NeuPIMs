@@ -14,6 +14,16 @@
 #include "tensor/NPUTensorInner.h"
 #include "tensor/PIMTensor.h"
 
+StageProgram::StageProgram(Ptr<Model> model, Ptr<BatchedRequest> batched_request,
+                           StagePlatform stage_platform, Stage stage)
+    : _model(model),
+      _breq(batched_request),
+      _stage_platform(stage_platform),
+      _stage(stage),
+      _name(stagePlatformToString(stage_platform) + "_stage_" + stageToString(stage)) {
+    this->init_program();
+}
+
 ////////////////////////////////////////////////////////////////
 // Types of stages are classified into: init, default loop, end
 
@@ -56,193 +66,187 @@
 // | PIM | logit_softmax#3 |    attend#3     |        -        |        -        |        -        |
 
 
-//////////////////////////////////////
-// #1. Constructor: 
-
-StageProgram::StageProgram(Ptr<Model> model, Ptr<BatchedRequest> batched_request,
-                           StagePlatform stage_platform, Stage stage)
-    : _model(model),
-      _breq(batched_request),
-      _stage_platform(stage_platform),
-      _stage(stage),
-      _name(stagePlatformToString(stage_platform) + "_stage_" + stageToString(stage)) {
-    this->init_program();
-}
-
-
-//////////////////////////////////////
-// #2. Entry Point Functions
-
 void StageProgram::init_program() {
     assert(_stage != Stage::Finish);
 
     if (_breq->_reqs.size() == 0) {
-        spdlog::info("{}No request in this batch skip{}.");
+        std::string yellow = "\033[1;33m";
+        std::string reset = "\033[0m";
+        spdlog::info("{}No request in this batch skip{}", yellow, reset);
         return;
     }
 
-    // Loop through each sub-batch and initialize based on platform type
-    for (int sub_batch = 0; sub_batch < 3; ++sub_batch) {
-        spdlog::info("Initializing Sub-Batch #{}", sub_batch + 1);
-
-        if (_stage_platform == StagePlatform::PIM) {
-            if (skip_pim_stage()) {
-                spdlog::info("PIM: Skipping for Sub-Batch #{}", sub_batch + 1);
-                continue;
-            } else {
-                init_PIM_program(); // Initialize PIM program for each sub-batch
-            }
-        } else if (_stage_platform == StagePlatform::SA) {
-            init_SA_program(); // Initialize SA program for each sub-batch
-        }
+    if (_stage_platform == StagePlatform::PIM) {
+        if (skip_PIM_stage()) {
+            std::string yellow = "\033[1;33m";
+            std::string reset = "\033[0m";
+            spdlog::info("{}PIM: skip{}", yellow, reset);
+            return;
+        } else
+            init_PIM_program();
+    } else if (_stage_platform == StagePlatform::SA1) {
+        if (skip_SA1_stage()) {
+            std::string blue = "\033[1;34m";
+            std::string reset = "\033[0m";
+            spdlog::info("{}SA1: skip{}", blue, reset);
+            return;
+        } else
+            init_SA1_program();
+    } else if (_stage_platform == StagePlatform::SA2) {
+        if (skip_SA2_stage()) {
+            std::string cyan = "\033[1;36m";
+            std::string reset = "\033[0m";
+            spdlog::info("{}SA2: skip{}", cyan, reset);
+            return;
+        } else
+            init_SA2_program();
     }
 }
-
 
 //////////////////////////////////////
-// #2.1. Stage-related Condition Checks
+// #1. Stage-related Condition Checks
+//////////////////////////////////////
 
-// Check if the stagetype is INIT or DEFAULT_LOOP or END_LOOP
-StageType StageProgram::get_stage_type() {
-    switch (_stage) {
-        case Stage::A:
-        case Stage::B:
-        case Stage::C:
-        case Stage::D:
-        case Stage::E:
-            return StageType::INIT;
-
-        case Stage::F:
-        case Stage::G:
-        case Stage::H:
-        case Stage::I:
-        case Stage::J:
-        case Stage::K:
-            return StageType::DEFAULT_LOOP;
-
-        case Stage::L:
-        case Stage::M:
-        case Stage::N:
-        case Stage::O:
-        case Stage::P:
-            return StageType::END_LOOP;
-
-        default:
-            throw std::runtime_error("Unknown stage type");
-    }
+// Refactored Conditional Functions (skip conditions)
+bool StageProgram::skip_PIM_stage() {
+    return (_stage == Stage::A || _stage == Stage::N || _stage == Stage::O || _stage == Stage::P);
 }
 
-// Refactored Conditional Functions
-bool StageProgram::skip_pim_stage() {
-    StageType stage_type = get_stage_type();
-    return (stage_type == StageType::INIT && (_stage == Stage::A || _stage == Stage::E)) ||
-           (stage_type == StageType::END_LOOP && _stage == Stage::P);
+bool StageProgram::skip_SA1_stage() {
+    return (_stage == Stage::E || _stage == Stage::M || _stage == Stage::O || _stage == Stage::P);
 }
 
-bool StageProgram::enable_proj_ffns() {
-    StageType stage_type = get_stage_type();
-    return (stage_type == StageType::INIT && (_stage == Stage::C || _stage == Stage::D || _stage == Stage::E)) ||
-           (stage_type == StageType::DEFAULT_LOOP);
+bool StageProgram::skip_SA2_stage() {
+    return (_stage == Stage::A || _stage == Stage::B || _stage == Stage::C || _stage == Stage::D);
 }
 
+// Refactored Conditional Functions (enable conditions)
 bool StageProgram::enable_qkv_gen() {
-    StageType stage_type = get_stage_type();
-    return (stage_type == StageType::INIT && (_stage == Stage::A || _stage == Stage::B || _stage == Stage::C || _stage == Stage::D || _stage == Stage::E)) ||
-           (stage_type == StageType::DEFAULT_LOOP && (_stage == Stage::F || _stage == Stage::I || _stage == Stage::J));
+    return (_stage == Stage::A || _stage == Stage::B || _stage == Stage::C) ||
+           (_stage == Stage::G || _stage == Stage::I || _stage == Stage::K);
 }
 
-//////////////////////////////////////
-// #2.2. Stage-specific Initialization
+bool StageProgram::enable_proj() {
+    return (_stage == Stage::D || _stage == Stage::F || _stage == Stage::H) ||
+           (_stage == Stage::J || _stage == Stage::L || _stage == Stage::N);
+}
 
-void StageProgram::init_SA_program() {
-    spdlog::info(">>> Initialize SystolicArray Stage Model Program for Three-Batch Scheduling <<<");
+bool StageProgram::enable_ffn1s() {
+    return (_stage == Stage::E || _stage == Stage::G || _stage == Stage::I) ||
+           (_stage == Stage::K || _stage == Stage::M || _stage == Stage::O);
+}
+
+bool StageProgram::enable_ffn2s() {
+    return (_stage == Stage::F || _stage == Stage::H || _stage == Stage::J) ||
+           (_stage == Stage::L || _stage == Stage::N || _stage == Stage::P);
+}
+
+bool StageProgram::enable_logit_softmax() {
+    return (_stage == Stage::B || _stage == Stage::D || _stage == Stage::F) || 
+           (_stage == Stage::H || _stage == Stage::J || _stage == Stage::L); 
+}
+
+bool StageProgram::enable_attend() {
+    return (_stage == Stage::C || _stage == Stage::E || _stage == Stage::G) || 
+           (_stage == Stage::I || _stage == Stage::K || _stage == Stage::M); 
+}
+
+
+
+void StageProgram::init_SA1_program() {
+    spdlog::info(">>> Initialize SystolicArray (SA1) Stage Model Program <<<");
     auto N = _breq->get_num_rows();
     auto E = Config::global_config.model_n_embd;
 
-    // Loop through each sub-batch
-    for (int sub_batch = 0; sub_batch < 3; ++sub_batch) {
-        spdlog::info(">>> Processing Sub-Batch #{} <<<", sub_batch + 1);
-        
-        // Determine whether to enable FFNs or QKV generation based on the stage
-        bool lets_proj_ffns = enable_proj_ffns();
-        bool lets_qkvgen = enable_qkv_gen();
+    bool lets_proj = enable_proj();
+    bool lets_qkvgen = enable_qkv_gen();
 
-        std::vector<uint32_t> input_dim{N, E};
-        if (lets_proj_ffns) {
-            input_dim[1] /= Config::global_config.n_tp;
-        }
-        auto input = std::make_shared<NPUTensor>("input_" + std::to_string(sub_batch), input_dim, NPUTensorBufType::ACT, true);
-        std::vector<Ptr<BTensor>> inputs{input};
+    std::vector<uint32_t> input_dim{N, E};
+    auto input = std::make_shared<NPUTensor>("SA1_input", input_dim, NPUTensorBufType::ACT, true);
+    std::vector<Ptr<BTensor>> inputs{input};
 
-        if (lets_proj_ffns) {
-            // >>> StageType:: Projection + FFN1 (Separated FFN1)
-            inputs = projection_block(inputs);
-            inputs = ffn1_block(inputs);
-            spdlog::info("SA: Projection + FFN1 for Sub-Batch #{}", sub_batch + 1);
-        }
-
-        if (lets_qkvgen) {
-            // >>> StageType:: INIT/DEFAULT_LOOP : QKVGen
-            inputs = qkv_gen_block(inputs);
-            spdlog::info("SA: QKV generation for Sub-Batch #{}", sub_batch + 1);
-        }
-
-        find_executable_node(input);
+    if (lets_proj) {
+        // SA1 handles Projection
+        inputs = projection_block(inputs);
+        spdlog::info("SA1: Projection enabled");
     }
+
+    if (lets_qkvgen) {
+        // SA1 handles QKV Generation
+        inputs = qkv_gen_block(inputs);
+        spdlog::info("SA1: QKV Generation enabled");
+    }
+
+    find_executable_node(input);
 }
 
+void StageProgram::init_SA2_program() {
+    spdlog::info(">>> Initialize SystolicArray (SA2) Stage Model Program <<<");
+    auto N = _breq->get_num_rows();
+    auto E = Config::global_config.model_n_embd;
+
+    bool lets_ffn1s = enable_ffn1s();
+    bool lets_ffn2s = enable_ffn2s();
+
+    std::vector<uint32_t> input_dim{N, E};
+    if (lets_ffn1s || lets_ffn2s) {
+        input_dim[1] /= Config::global_config.n_tp;
+    }
+    auto input = std::make_shared<NPUTensor>("SA2_input", input_dim, NPUTensorBufType::ACT, true);
+    std::vector<Ptr<BTensor>> inputs{input};
+
+    if (lets_ffn1s) {
+        // SA2 handles FFN1
+        inputs = ffn1_block(inputs);
+        spdlog::info("SA2: FFN1 enabled");
+    }
+
+    if (lets_ffn2s) {
+        // SA2 handles FFN2
+        inputs = ffn2_block(inputs);
+        spdlog::info("SA2: FFN2 enabled");
+    }
+
+    find_executable_node(input);
+}
 
 void StageProgram::init_PIM_program() {
-    spdlog::info(">>> Initialize PIM Stage Model Program for Three-Batch Scheduling <<<");
+    spdlog::info(">>> Initialize PIM Stage Model Program <<<");
 
-    int sub_batch_size = _breq->_reqs.size();
     uint32_t num_heads = Config::global_config.model_n_head / Config::global_config.n_tp;
     uint32_t dk = Config::global_config.model_n_embd / Config::global_config.model_n_head;
+    std::vector<Ptr<BTensor>> querys;
+    std::vector<Ptr<BTensor>> keys;
+    std::vector<Ptr<BTensor>> values;
 
-    // Loop through each sub-batch
-    for (int sub_batch = 0; sub_batch < 3; ++sub_batch) {
-        spdlog::info(">>> Processing Sub-Batch #{} <<<", sub_batch + 1);
+    for (auto& request : _breq->_reqs) {
+        auto query = std::make_shared<NPUTensor>("query", std::vector<uint32_t>{num_heads, 1, dk},
+                                                 NPUTensorBufType::ACT, true);
+        querys.push_back(query);
+        keys.push_back(request->K_cache[0]);
+        values.push_back(request->V_cache[0]);
+    }
 
-        Ptr<NPUTensor> query;
-        std::vector<Ptr<BTensor>> querys;
-        std::vector<Ptr<BTensor>> keys;
-        std::vector<Ptr<BTensor>> values;
-
-        for (int j = 0; j < sub_batch_size; j++) {
-            Ptr<InferRequest> request = _breq->_reqs[j];
-            int q_len = request->is_initiated ? 1 : request->input_size;
-            assert(q_len == 1);
-
-            query = std::make_shared<NPUTensor>("query_" + std::to_string(sub_batch), std::vector<uint32_t>{num_heads, q_len, dk},
-                                                NPUTensorBufType::ACT, true);
-            querys.push_back(query);
-            keys.push_back(request->K_cache[0]);
-            values.push_back(request->V_cache[0]);
-        }
-
-        std::vector<Ptr<BTensor>> mha_pim_inputs = querys;
-        mha_pim_inputs.insert(mha_pim_inputs.end(), keys.begin(), keys.end());
-
-        // >>> Logit Softmax for MHA
+    // Logit Softmax
+    if (enable_logit_softmax()) {
         auto logit_softmax = add_op(std::make_shared<NeuPIMSLogitSoftmax>(
             name_gen(LAYER(0), BlockType::Attention, OperationType::NeuPIMSLogitSoftmax)));
-        std::vector<Ptr<BTensor>> inputs = get_outputs(logit_softmax, mha_pim_inputs);
-        spdlog::info("PIM: Logit Softmax for Sub-Batch #{}", sub_batch + 1);
+        querys = get_outputs(logit_softmax, querys);
+        spdlog::info("PIM: Logit Softmax enabled");
+    }
 
-        // >>> Attend for MHA
-        inputs.insert(inputs.end(), values.begin(), values.end());
+    // Attend
+    if (enable_attend()) {
         auto attend = add_op(std::make_shared<NeuPIMSAttend>(
             name_gen(LAYER(0), BlockType::Attention, OperationType::NeuPIMSAttend)));
-        inputs = get_outputs(attend, inputs);
-        spdlog::info("PIM: Attend for Sub-Batch #{}", sub_batch + 1);
+        querys = get_outputs(attend, querys);
+        spdlog::info("PIM: Attend enabled");
+    }
 
+    for (auto& query : querys) {
         find_executable_node(query);
     }
 }
-
-
-//////////////////////////////////////
-// #3. Operation & Graph Management  (unchanged)
 
 Ptr<Operation> StageProgram::add_op(std::shared_ptr<Operation> op) {
     // spdlog::info("operation {} added. add_op", op->get_name());
@@ -302,9 +306,6 @@ bool StageProgram::check_finish() {
     return finish;
 }
 
-//////////////////////////////
-// #4. List statistics, Logging
-
 std::vector<OperationStat> StageProgram::list_operation_stat() {
     std::vector<OperationStat> ret;
     for (auto &[key, val] : _op_map) {
@@ -326,9 +327,6 @@ void StageProgram::log() {
     std::string fname = Config::global_config.log_dir + "/" + _name;
     Logger::log(list_operation_stat(), fname);
 }
-
-//////////////////////////////////////
-// #5. Computation Blocks (Sub-operations)
 
 std::vector<Ptr<BTensor>> StageProgram::projection_block(std::vector<Ptr<BTensor>> inputs) {
     auto N = _breq->get_num_rows();
@@ -353,12 +351,10 @@ std::vector<Ptr<BTensor>> StageProgram::projection_block(std::vector<Ptr<BTensor
     inputs = get_outputs(residual, inputs);
     return inputs;
 }
-// (original) ffn1_block includes ffn2
-// I want to separate ffn1_block into ffn1_block and ffn2_block
+
 // ffn1_block(original): LayerNorm -> MatMul(fc1) -> Gelu -> MatMul(fc2) -> Add
 // ffn1_block(new): FFN1 (LayerNorm -> MatMul(fc1) -> Gelu)
 // ffn2_block(new): FFN2 (FFN1-> MatMul(fc2) -> Add)
-// ffn1_block(new): FFN1 (LayerNorm -> MatMul(fc1) -> Gelu)
 std::vector<Ptr<BTensor>> StageProgram::ffn1_block(std::vector<Ptr<BTensor>> inputs) {
     int layer = 0;
     std::string prefix = name_gen(LAYER(layer), BlockType::FeedForward);
@@ -402,7 +398,6 @@ std::vector<Ptr<BTensor>> StageProgram::ffn2_block(std::vector<Ptr<BTensor>> inp
 
     return inputs;
 }
-
 
 std::vector<Ptr<BTensor>> StageProgram::qkv_gen_block(std::vector<Ptr<BTensor>> inputs) {
     int layer = 0;

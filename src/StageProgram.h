@@ -10,12 +10,6 @@
 #include "operations/Operation.h"
 #include "tensor/BTensor.h"
 
-enum class StageType {
-    INIT,
-    DEFAULT_LOOP,
-    END_LOOP
-};
-
 class StageProgram {
    public:
     StageProgram(std::shared_ptr<Model> model, Ptr<BatchedRequest> batched_request,
