@@ -565,8 +565,9 @@ uint64_t AddressConfig::encode_pim_comps_readres(int ch, int row, int num_comps,
 
     return make_address(ch, rank, bankgroup, bank, row, col);
 }
-// [TODO]
 // used for sub-batch interleaving
+
+#ifdef TRI
 std::string stageToString(Stage stage) {
     static const std::map<Stage, std::string> stageMap = {
         {Stage::A, "A"}, {Stage::B, "B"}, {Stage::C, "C"}, {Stage::D, "D"},
@@ -579,7 +580,21 @@ std::string stageToString(Stage stage) {
     auto it = stageMap.find(stage);
     return (it != stageMap.end()) ? it->second : "unknown";
 }
+#endif
 
+#ifdef TRI
+std::string stagePlatformToString(StagePlatform sp) {
+    static const std::map<StagePlatform, std::string> spMap = {
+        {StagePlatform::SASA, "SASA"},
+        {StagePlatform::SA1, "SA1"},
+        {StagePlatform::SA2, "SA2"},
+        {StagePlatform::PIM, "PIM"},
+    };
+
+    auto it = spMap.find(sp);
+    return (it != spMap.end()) ? it->second : "unknown";
+}
+#else
 std::string stagePlatformToString(StagePlatform sp) {
     static const std::map<StagePlatform, std::string> spMap = {
         {StagePlatform::SA1, "SA1"},
@@ -590,3 +605,4 @@ std::string stagePlatformToString(StagePlatform sp) {
     auto it = spMap.find(sp);
     return (it != spMap.end()) ? it->second : "unknown";
 }
+#endif

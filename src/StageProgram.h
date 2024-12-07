@@ -40,6 +40,7 @@ class StageProgram {
     StagePlatform _stage_platform;
     Stage _stage;
 
+    #ifdef TRI
     void init_SA1_program();
     void init_SA2_program();
     void init_PIM_program();
@@ -54,6 +55,14 @@ class StageProgram {
     bool enable_ffn2s();
     bool enable_logit_softmax();
     bool enable_attend();
+    #else
+    void init_SA_program();
+    void init_PIM_program();
+
+    bool enable_proj_ffns();
+    bool enable_qkv_gen();
+    bool skip_pim_stage();   
+    #endif
 
     std::vector<Ptr<BTensor>> projection_block(std::vector<Ptr<BTensor>> inputs);
     std::vector<Ptr<BTensor>> ffn1_block(std::vector<Ptr<BTensor>> inputs);

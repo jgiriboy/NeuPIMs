@@ -65,7 +65,7 @@ StageProgram::StageProgram(Ptr<Model> model, Ptr<BatchedRequest> batched_request
 // | SA2 |    FFN2s#1      |    FFN1s#2      |    FFN2s#2      |    FFN1s#3      |    FFN2s#3      |
 // | PIM | logit_softmax#3 |    attend#3     |        -        |        -        |        -        |
 
-
+#ifdef TRI
 void StageProgram::init_program() {
     assert(_stage != Stage::Finish);
 
@@ -102,11 +102,34 @@ void StageProgram::init_program() {
             init_SA2_program();
     }
 }
+#else
+void StageProgram::init_program() {
+    assert(_stage != Stage::Finish);
 
+    if (_breq->_reqs.size() == 0) {
+        std::string yellow = "\033[1;33m";
+        std::string reset = "\033[0m";
+        spdlog::info("{}No request in this batch skip{}", yellow, reset);
+        return;
+    }
+
+    if (_stage_platform == StagePlatform::PIM) {
+        if (skip_pim_stage()) {
+            std::string yellow = "\033[1;33m";
+            std::string reset = "\033[0m";
+            spdlog::info("{}PIM: skip{}", yellow, reset);
+            return;
+        } else
+            init_PIM_program();
+    } else if (_stage_platform == StagePlatform::SA)
+        init_SA_program();
+}
+#endif
 //////////////////////////////////////
 // #1. Stage-related Condition Checks
 //////////////////////////////////////
 
+#ifdef TRI
 // Refactored Conditional Functions (skip conditions)
 bool StageProgram::skip_PIM_stage() {
     return (_stage == Stage::A || _stage == Stage::N || _stage == Stage::O || _stage == Stage::P);
@@ -150,9 +173,20 @@ bool StageProgram::enable_attend() {
     return (_stage == Stage::C || _stage == Stage::E || _stage == Stage::G) || 
            (_stage == Stage::I || _stage == Stage::K || _stage == Stage::M); 
 }
+#else
+bool StageProgram::skip_pim_stage() { return _stage == Stage::A || _stage == Stage::F; }
+
+bool StageProgram::enable_proj_ffns() {
+    return _stage == Stage::C || _stage == Stage::D || _stage == Stage::E || _stage == Stage::F;
+}
+
+bool StageProgram::enable_qkv_gen() {
+    return _stage == Stage::A || _stage == Stage::B || _stage == Stage::C || _stage == Stage::D;
+}
+#endif
 
 
-
+#ifdef TRI
 void StageProgram::init_SA1_program() {
     spdlog::info(">>> Initialize SystolicArray (SA1) Stage Model Program <<<");
     auto N = _breq->get_num_rows();
@@ -247,6 +281,96 @@ void StageProgram::init_PIM_program() {
         find_executable_node(query);
     }
 }
+#else
+void StageProgram::init_SA_program() {
+    spdlog::info(">>> Initialize SystolicArray Stage Model Program <<<");
+    auto N = _breq->get_num_rows();
+    auto E = Config::global_config.model_n_embd;
+
+    bool lets_proj_ffns = enable_proj_ffns();
+    bool lets_qkvgen = enable_qkv_gen();
+
+    std::vector<uint32_t> input_dim{N, E};
+    if (lets_proj_ffns) {
+        input_dim[1] /= Config::global_config.n_tp;
+    }
+    auto input = std::make_shared<NPUTensor>("input", input_dim, NPUTensorBufType::ACT, true);
+    std::vector<Ptr<BTensor>> inputs{input};
+
+    if (lets_proj_ffns) {
+        // >>> Stage: C/D/E/F : Projection + FFN1 + FFN2
+        inputs = projection_block(inputs);
+        inputs = ffn1_block(inputs);  // FFN1 & FFN2
+        std::string yellow = "\033[1;33m";
+        std::string reset = "\033[0m";
+        spdlog::info("{}SA : Projection + FFN1 + FFN2{}", yellow, reset);
+        // <<< Stage: C/D/E/F
+    }
+
+    if (lets_qkvgen) {
+        // >>> Stage: A/B/C/D : QKVGen
+        inputs = qkv_gen_block(inputs);
+
+        std::string yellow = "\033[1;33m";
+        std::string reset = "\033[0m";
+        spdlog::info("{}SA : QKV generation{}", yellow, reset);
+        // <<< Stage:: A/B/C/D
+    }
+
+    find_executable_node(input);
+}
+
+void StageProgram::init_PIM_program() {
+    spdlog::info(">>> Initialize PIM Stage Model Program <<<");
+    std::string yellow = "\033[1;33m";
+    std::string reset = "\033[0m";
+    spdlog::info("{}PIM: MHA{}", yellow, reset);
+    Ptr<NPUTensor> query;
+    std::vector<Ptr<BTensor>> inputs;
+
+    int sub_batch_size = _breq->_reqs.size();
+
+    uint32_t num_heads = Config::global_config.model_n_head / Config::global_config.n_tp;
+    uint32_t dk = Config::global_config.model_n_embd / Config::global_config.model_n_head;  // 64;
+
+    std::vector<Ptr<BTensor>> querys;
+    std::vector<Ptr<BTensor>> keys;
+    std::vector<Ptr<BTensor>> values;
+
+    for (int j = 0; j < sub_batch_size; j++) {
+        /* - [] todo: change query to real query from gkv gen */
+        Ptr<InferRequest> request = _breq->_reqs[j];
+        int q_len = request->is_initiated ? 1 : request->input_size;
+        assert(q_len == 1);
+
+        query = std::make_shared<NPUTensor>("query", std::vector<uint32_t>{num_heads, q_len, dk},
+                                            NPUTensorBufType::ACT, true);
+        querys.push_back(query);
+
+        /* key/value cache */
+        keys.push_back(request->K_cache[0]);
+        values.push_back(request->V_cache[0]);
+    }
+
+    /* gemv + softmax */
+    std::vector<Ptr<BTensor>> mha_pim_inputs = querys;
+    mha_pim_inputs.insert(mha_pim_inputs.end(), keys.begin(),
+                          keys.end());  // querys, keys
+
+    auto logit_softmax = add_op(std::make_shared<NeuPIMSLogitSoftmax>(
+        name_gen(LAYER(0), BlockType::Attention, OperationType::NeuPIMSLogitSoftmax)));
+    inputs = get_outputs(logit_softmax, mha_pim_inputs);
+
+    /* pim_gemv + add */
+    inputs.insert(inputs.end(), values.begin(), values.end());  // logits, values
+
+    auto attend = add_op(std::make_shared<NeuPIMSAttend>(
+        name_gen(LAYER(0), BlockType::Attention, OperationType::NeuPIMSAttend)));
+    inputs = get_outputs(attend, inputs);
+
+    find_executable_node(query);
+}
+#endif
 
 Ptr<Operation> StageProgram::add_op(std::shared_ptr<Operation> op) {
     // spdlog::info("operation {} added. add_op", op->get_name());
@@ -327,7 +451,7 @@ void StageProgram::log() {
     std::string fname = Config::global_config.log_dir + "/" + _name;
     Logger::log(list_operation_stat(), fname);
 }
-
+#ifdef TRI
 std::vector<Ptr<BTensor>> StageProgram::projection_block(std::vector<Ptr<BTensor>> inputs) {
     auto N = _breq->get_num_rows();
     auto E = Config::global_config.model_n_embd;
@@ -417,3 +541,79 @@ std::vector<Ptr<BTensor>> StageProgram::qkv_gen_block(std::vector<Ptr<BTensor>> 
 
     return inputs;
 }
+#else
+std::vector<Ptr<BTensor>> StageProgram::projection_block(std::vector<Ptr<BTensor>> inputs) {
+    auto N = _breq->get_num_rows();
+    auto E = Config::global_config.model_n_embd;
+
+    std::vector<uint32_t> input_dim{N, E};
+    auto res_buf =
+        std::make_shared<NPUTensor>("residual_buffer", input_dim, NPUTensorBufType::ACT, true);
+
+    int layer = 0;
+    auto prefix = name_gen(LAYER(0), BlockType::Attention);
+    // auto res_buf = inputs[0];
+
+    auto projection = add_op(std::make_shared<MatMul>(
+        name_gen(prefix, OperationType::Projection),
+        _model->get_params(layer, BlockType::Attention, OperationType::Projection)));
+    inputs = get_outputs(projection, inputs);
+
+    // fixme: residual is not with this tensor.
+    auto residual = add_op(std::make_shared<Add>(name_gen(prefix, OperationType::Residual)));
+    inputs.push_back(res_buf);
+    inputs = get_outputs(residual, inputs);
+    return inputs;
+}
+std::vector<Ptr<BTensor>> StageProgram::ffn1_block(std::vector<Ptr<BTensor>> inputs) {
+    int layer = 0;
+    auto res_buf = inputs[0];
+    std::string prefix = name_gen(LAYER(layer), BlockType::FeedForward);
+    // create operations
+    auto ln = add_op(std::make_shared<LayerNorm>(
+        name_gen(prefix, OperationType::LayerNorm),
+        _model->get_params(layer, BlockType::FeedForward, OperationType::LayerNorm)));
+    inputs = get_outputs(ln, inputs);
+
+    auto fc1 = add_op(std::make_shared<MatMul>(
+        name_gen(prefix, OperationType::FullyConnected1),
+        _model->get_params(layer, BlockType::FeedForward, OperationType::FullyConnected1)));
+    inputs = get_outputs(fc1, inputs);
+
+    auto gelu = add_op(std::make_shared<Gelu>(name_gen(prefix, OperationType::Gelu)));
+    inputs = get_outputs(gelu, inputs);
+
+    auto fc2 = add_op(std::make_shared<MatMul>(
+        name_gen(prefix, OperationType::FullyConnected2),
+        _model->get_params(layer, BlockType::FeedForward, OperationType::FullyConnected2)));
+    inputs = get_outputs(fc2, inputs);
+
+    auto residual = add_op(std::make_shared<Add>(name_gen(prefix, OperationType::Residual)));
+    inputs.push_back(res_buf);
+    inputs = get_outputs(residual, inputs);
+    return inputs;
+}
+std::vector<Ptr<BTensor>> StageProgram::ffn2_block(std::vector<Ptr<BTensor>> inputs) {
+    // ffn1_block includes ffn2
+    return inputs;
+}
+
+std::vector<Ptr<BTensor>> StageProgram::qkv_gen_block(std::vector<Ptr<BTensor>> inputs) {
+    int layer = 0;
+    auto prefix = name_gen(LAYER(0), BlockType::Attention);
+
+    // (N,E) -> (N,E)
+    auto ln1 = add_op(std::make_shared<LayerNorm>(
+        name_gen(prefix, OperationType::LayerNorm),
+        _model->get_params(layer, BlockType::Attention, OperationType::LayerNorm)));
+    inputs = get_outputs(ln1, inputs);
+
+    // (N,E) x (E,3E)
+    auto qkv_gen = add_op(std::make_shared<MatMul>(
+        name_gen(prefix, OperationType::QKVGen),
+        _model->get_params(layer, BlockType::Attention, OperationType::QKVGen)));
+    inputs = get_outputs(qkv_gen, inputs);
+
+    return inputs;
+}
+#endif

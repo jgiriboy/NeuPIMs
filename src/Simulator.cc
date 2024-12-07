@@ -136,7 +136,6 @@ void Simulator::cycle() {
                 update_stage_stat();
             }
             _scheduler->cycle();
-            // [TODO] START FROM HERE
             for (int core_id = 0; core_id < _n_cores; core_id++) {
                 auto finished_tile = _cores[core_id]->pop_finished_tile();
                 if (finished_tile == nullptr) {
@@ -145,10 +144,26 @@ void Simulator::cycle() {
                 }
 
                 // Issue new tile to core
+                #ifdef TRI
+                if (_scheduler->empty1() && _scheduler->empty2() && _scheduler->empty3())
+                    continue;
+                #else
                 if (_scheduler->empty1() && _scheduler->empty2())
                     continue;
-
+                #endif
                 // >>> todo: support 2 sub-batch
+                #ifdef TRI
+                if (!_scheduler->empty1()) {
+                    Tile &tile = _scheduler->top_tile1(core_id);
+                    if ((tile.status != Tile::Status::EMPTY) && _cores[core_id]->can_issue(tile)) {
+                        if (tile.status == Tile::Status::INITIALIZED) {
+                            assert(tile.stage_platform == StagePlatform::SA1);
+                            _cores[core_id]->issue(tile);
+                            _scheduler->get_tile1(core_id);
+                        }
+                    }
+                }
+                #else
                 if (!_scheduler->empty1()) {
                     Tile &tile = _scheduler->top_tile1(core_id);
                     if ((tile.status != Tile::Status::EMPTY) && _cores[core_id]->can_issue(tile)) {
@@ -159,6 +174,7 @@ void Simulator::cycle() {
                         }
                     }
                 }
+                #endif
                 if (!_scheduler->empty2()) {
                     Tile &tile = _scheduler->top_tile2(core_id);
                     if ((tile.status != Tile::Status::EMPTY) && _cores[core_id]->can_issue_pim()) {
@@ -169,12 +185,23 @@ void Simulator::cycle() {
                         }
                     }
                 }
+                #ifdef TRI
+                if (!_scheduler->empty3()) {
+                    Tile &tile = _scheduler->top_tile3(core_id);
+                    if ((tile.status != Tile::Status::EMPTY) && _cores[core_id]->can_issue(tile)) {
+                        if (tile.status == Tile::Status::INITIALIZED) {
+                            assert(tile.stage_platform == StagePlatform::SA2);
+                            _cores[core_id]->issue(tile);
+                            _scheduler->get_tile3(core_id);
+                        }
+                    }
+                }
+                #endif
                 // <<< todo: support 2 sub-batch
                 _cores[core_id]->cycle();
             }
             _core_cycles++;
         }
-
         // DRAM cycle
         if (_cycle_mask & DRAM_MASK) {
             _dram->cycle();

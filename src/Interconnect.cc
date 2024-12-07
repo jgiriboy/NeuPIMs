@@ -87,16 +87,23 @@ void SimpleInterconnect::cycle() {
                 } else {
                     uint32_t mem_ch = dest - _dram_offset;
                     MemoryAccess *mem_req = _in_buffers[src_node].front().access;
-                    if (!_config.sub_batch_mode) {
-                        // When single buffer PIM (Newton), there is single batch,
-                        // so use one interconnect queue.
-                        mem_req->stage_platform = StagePlatform::SA1; // [TODO] review_JYK
-                        // Based on the assumption that our config ALWAYS support sub_batch_mode
-                    }
+                    assert(_config.sub_batch_mode);
+                    // if (!_config.sub_batch_mode) {
+                    //     // When single buffer PIM (Newton), there is single batch,
+                    //     // so use one interconnect queue.
+                    //     mem_req->stage_platform = StagePlatform::SA1; // [TODO] review_JYK
+                    //     // Based on the assumption that our config ALWAYS support sub_batch_mode
+                    // }
+                    #ifdef TRI
                     assert(mem_req->stage_platform == StagePlatform::SA1 ||
                            mem_req->stage_platform == StagePlatform::SA2 ||
                            mem_req->stage_platform == StagePlatform::PIM);
-                    // [TODO]
+                    #else
+                    assert(mem_req->stage_platform == StagePlatform::SA ||
+                           mem_req->stage_platform == StagePlatform::PIM);
+                    #endif
+                
+                    #ifdef TRI
                     if (mem_req->stage_platform == StagePlatform::SA1)
                         _mem_req_queue0[mem_ch].push(mem_req);
                     else if (mem_req->stage_platform == StagePlatform::SA2)
@@ -105,6 +112,14 @@ void SimpleInterconnect::cycle() {
                         _mem_req_queue2[mem_ch].push(mem_req);
                     else
                         exit(-1);
+                    #else
+                    if (mem_req->stage_platform == StagePlatform::SA)
+                        _mem_req_queue0[mem_ch].push(mem_req);
+                    else if (mem_req->stage_platform == StagePlatform::PIM)
+                        _mem_req_queue2[mem_ch].push(mem_req);
+                    else
+                        exit(-1);
+                    #endif
                 }
                 _in_buffers[src_node].pop();
                 _busy_node[dest] = true;

@@ -245,7 +245,6 @@ void Scheduler::allocate_requests() {
     // exit(-1);
 }
 
-//[TODO]
 void Scheduler::make_program() {
     std::shared_ptr<BatchedRequest> sub_batch_on_sa;
     std::shared_ptr<BatchedRequest> sub_batch_on_pim;
@@ -290,12 +289,12 @@ void Scheduler::make_program() {
             break;
     }
 
-    spdlog::info("New Program for SA  (sub-batch.size: {})", sub_batch_on_sa->_reqs.size());
+    spdlog::info("New Program for SA1 (sub-batch.size: {})", sub_batch_on_sa->_reqs.size());
     spdlog::info("New Program for SA2  (sub-batch.size: {})", sub_batch_on_sa_2->_reqs.size());
     spdlog::info("New Program for PIM (sub-batch.size: {})", sub_batch_on_pim->_reqs.size());
 
     _model_program1 =
-        std::make_unique<StageProgram>(_model, sub_batch_on_sa, StagePlatform::SA, _stage);
+        std::make_unique<StageProgram>(_model, sub_batch_on_sa, StagePlatform::SA1, _stage);
     _model_program2 =
         std::make_unique<StageProgram>(_model, sub_batch_on_pim, StagePlatform::PIM, _stage);
     _model_program3 =
@@ -322,8 +321,6 @@ void Scheduler::make_program() {
         std::make_unique<StageProgram>(_model, sub_batch_on_sa, StagePlatform::SA, _stage);
     _model_program2 =
         std::make_unique<StageProgram>(_model, sub_batch_on_pim, StagePlatform::PIM, _stage);
-    //_model_program3 =
-    //    std::make_unique<StageProgram>(_model, sub_batch_on_sa_2, StagePlatform::SA, _stage);
 
 
     refresh_status1();
@@ -606,7 +603,11 @@ Tile& Scheduler::top_tile1(uint32_t core_id) {
         if (tile.status == Tile::Status::BAR) {
             return empty_tile;
         } else {
+            #ifdef TRI
+            tile.stage_platform = StagePlatform::SA1;
+            #else
             tile.stage_platform = StagePlatform::SA;
+            #endif
             return tile;
         }
     }
@@ -627,7 +628,6 @@ Tile& Scheduler::top_tile2(uint32_t core_id) {
     }
 }
 
-// [TODO]
 #ifdef TRI
 Tile& Scheduler::top_tile3(uint32_t core_id) {
     static Tile empty_tile = Tile{.status = Tile::Status::EMPTY};
@@ -695,7 +695,6 @@ void Scheduler::get_tile2(uint32_t core_id) {
     }
 }
 
-// [TODO]
 #ifdef TRI
 void Scheduler::get_tile3(uint32_t core_id) {
     if (_executable_tile_queue3.empty()) {
@@ -725,7 +724,6 @@ void Scheduler::get_tile3(uint32_t core_id) {
 //  update operation stat
 //  if operation is finished
 //      apply to _model_program & return true
-// [TODO]
 bool Scheduler::finish_tile(uint32_t core_id, Tile& tile) {
     bool result = false;
     spdlog::debug("Tile {} Core {} Finish Tile at {}", tile.operation_id, core_id, *_core_cycle);
@@ -737,13 +735,14 @@ bool Scheduler::finish_tile(uint32_t core_id, Tile& tile) {
     spdlog::info("Finish tile stage_platform:{}", stagePlatformToString(tile.stage_platform));
     #ifdef TRI
     
-    if (tile.stage_platform == StagePlatform::SA)
+    if (tile.stage_platform == StagePlatform::SA1)
         _model_program1->finish_operation_tile(tile);
     else if (tile.stage_platform == StagePlatform::PIM)
         _model_program2->finish_operation_tile(tile);
-    else
+    else{
+        assert(tile.stage_platform == StagePlatform::SA2);
         _model_program3->finish_operation_tile(tile);
-    
+    }
     #else
     
     if (tile.stage_platform == StagePlatform::SA)
@@ -762,13 +761,14 @@ bool Scheduler::finish_tile(uint32_t core_id, Tile& tile) {
 
         #ifdef TRI
 
-        if (tile.stage_platform == StagePlatform::SA)
+        if (tile.stage_platform == StagePlatform::SA1)
             _model_program1->finish_operation(tile.operation_id);
         else if (tile.stage_platform == StagePlatform::PIM)
             _model_program2->finish_operation(tile.operation_id);
-        else 
+        else {
+            assert(tile.stage_platform == StagePlatform::SA2);
             _model_program3->finish_operation(tile.operation_id);
-
+        }
         #else
 
         if (tile.stage_platform == StagePlatform::SA)
@@ -784,13 +784,14 @@ bool Scheduler::finish_tile(uint32_t core_id, Tile& tile) {
 
     #ifdef TRI
 
-    if (tile.stage_platform == StagePlatform::SA)
+    if (tile.stage_platform == StagePlatform::SA1)
         refresh_status1();
     else if (tile.stage_platform == StagePlatform::PIM)
         refresh_status2();
-    else 
+    else{
+        assert(tile.stage_platform == StagePlatform::SA2);
         refresh_status3();
-
+    }
     #else
 
     if (tile.stage_platform == StagePlatform::SA)
@@ -1004,7 +1005,6 @@ void Scheduler::refresh_status2() {
 }
 
 
-// [TODO]
 #ifdef TRI
 void Scheduler::refresh_status3() {
     if (_model_program3 != nullptr) {

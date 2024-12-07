@@ -108,11 +108,15 @@ void NeuPIMSystolicWS::ld_queue_cycle() {
             }
 
             ast(!front.src_addrs.empty());
-
+            #ifdef TRI
+            auto accesses = MemoryAccess::from_instruction(
+                front, generate_mem_access_id(), _config.dram_req_size, MemoryAccessType::READ,
+                true, _id, _core_cycle, buffer_id, StagePlatform::SASA);
+            #else
             auto accesses = MemoryAccess::from_instruction(
                 front, generate_mem_access_id(), _config.dram_req_size, MemoryAccessType::READ,
                 true, _id, _core_cycle, buffer_id, StagePlatform::SA);
-
+            #endif
             // xxx is this right? size, count<<src_addrs size
             buffer->reserve(front.dest_addr, buffer_id, front.size, accesses.size());
             if (auto tile = front.parent_tile.lock()) {
@@ -143,9 +147,13 @@ void NeuPIMSystolicWS::ld_queue_cycle() {
 
             ast(!front.src_addrs.empty());
 
+            #ifdef TRI
+            MemoryAccess *mem_request = TransToMemoryAccess(
+                front, _config.dram_req_size, _id, _core_cycle, buffer_id, StagePlatform::SASA);
+            #else
             MemoryAccess *mem_request = TransToMemoryAccess(
                 front, _config.dram_req_size, _id, _core_cycle, buffer_id, StagePlatform::SA);
-
+            #endif
             if (front.opcode == Opcode::PIM_READRES || front.opcode == Opcode::PIM_COMPS_READRES)
                 buffer->reserve(front.dest_addr, buffer_id, front.size, 1);
 
@@ -212,9 +220,15 @@ void NeuPIMSystolicWS::st_queue_cycle() {
         // spdlog::info("{}", front.repr());
         if (buffer->check_hit(front.dest_addr, buffer_id) &&
             (front.opcode == Opcode::MOVOUT || front.opcode == Opcode::MOVOUT_POOL)) {
+            #ifdef TRI
+            auto accesses = MemoryAccess::from_instruction(
+                front, generate_mem_access_id(), _config.dram_req_size, MemoryAccessType::WRITE,
+                true, _id, _core_cycle, buffer_id, StagePlatform::SASA);
+            #else
             auto accesses = MemoryAccess::from_instruction(
                 front, generate_mem_access_id(), _config.dram_req_size, MemoryAccessType::WRITE,
                 true, _id, _core_cycle, buffer_id, StagePlatform::SA);
+            #endif
             if (auto tile = front.parent_tile.lock()) {
                 tile->remaining_accum_io += accesses.size() - 1;
                 tile->stat.memory_writes += accesses.size() * AddressConfig::alignment;
