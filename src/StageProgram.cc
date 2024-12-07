@@ -58,7 +58,7 @@ StageProgram::StageProgram(Ptr<Model> model, Ptr<BatchedRequest> batched_request
 // | SA2 |    FFN2s#1      |    FFN1s#2      |      FFN2s#2    |    FFN1s#3      |    FFN2s#3      |    FFN1s#1      |
 // | PIM | logit_softmax#3 |    attend#3     | logit_softmax#1 |    attend#1     | logit_softmax#2 |    attend#2     |
 
-// |     |                                  end loop (6 stages)                                    | 
+// |     |                                  end loop (5 stages)                                    | 
 // |     |        L        |        M        |        N        |       O         |        P        |
 // |-----|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|
 // | SA1 |      Pj#2       |        -        |       Pj#3      |        -        |        -        |
