@@ -119,7 +119,7 @@ void StageProgram::init_PIM_program() {
     for (int j = 0; j < sub_batch_size; j++) {
         /* - [] todo: change query to real query from gkv gen */
         Ptr<InferRequest> request = _breq->_reqs[j];
-        int q_len = request->is_initiated ? 1 : request->input_size;
+        uint32_t q_len = request->is_initiated ? 1 : request->input_size;
         assert(q_len == 1);
 
         query = std::make_shared<NPUTensor>("query", std::vector<uint32_t>{num_heads, q_len, dk},

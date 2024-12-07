@@ -113,6 +113,8 @@ void NeuPIMSCore::issue(Tile &in_tile) {
     tile->remaining_loads = 0;
     tile->remaining_computes = 0;
     tile->remaining_accum_io = 0;
+    // EE514
+    spdlog::info("instuructions in tile: {}", tile->instructions.size());
     for (auto &inst : tile->instructions) {
         inst.parent_tile = std::weak_ptr<Tile>(tile);
         inst.spad_id = tile->spad_id;
@@ -142,6 +144,7 @@ void NeuPIMSCore::issue(Tile &in_tile) {
             }
             if (!buffer->check_allocated(inst.dest_addr, buffer_id) &&
                 buffer->check_remain(inst.size, buffer_id)) {
+                    // EE514
                 tile->remaining_loads++;
                 _ld_inst_queue_for_sa.push(inst);
             } else {
@@ -154,15 +157,19 @@ void NeuPIMSCore::issue(Tile &in_tile) {
                 assert(0);
             }
         } else if (inst.opcode == Opcode::MOVOUT || inst.opcode == Opcode::MOVOUT_POOL) {
+            // EE514
             tile->remaining_accum_io++;
             _st_inst_queue_for_sa.push(inst);
         } else {
             /* Ex inst queue */
+            // EE514
             tile->remaining_accum_io++;
             tile->remaining_computes++;
             _ex_inst_queue_for_sa.push(inst);
         }
     }
+    
+    // EE514
     // spdlog::info("tile pushed to core._tiles {}", tile.repr());
     _tiles.push_back(tile);
 }
@@ -256,13 +263,14 @@ void NeuPIMSCore::cycle() {
     _spad.cycle();
     _acc_spad.cycle();
 
-    // spdlog::info("current spad {}", _current_spad);
+    // EE514
+    spdlog::info("current spad: {} current core: {}", _current_spad, _id);
     for (auto tile_it = _tiles.begin(); tile_it != _tiles.end();) {
         auto tile = *tile_it;
-        // spdlog::info(
-        //     "tile index: {}, tile remain_accum_io: {}, remain_computes: {}, remain_loads: {}",
-        //     tile_it - _tiles.begin(), tile->remaining_accum_io, tile->remaining_computes,
-        //     tile->remaining_loads);
+        spdlog::info(
+            "tile index: {}, tile remain_accum_io: {}, remain_computes: {}, remain_loads: {}",
+            tile_it - _tiles.begin(), tile->remaining_accum_io, tile->remaining_computes,
+            tile->remaining_loads);
         if ((tile->remaining_accum_io == 0) && (tile->remaining_computes == 0) &&
             (tile->remaining_loads == 0)) {
             tile->status = Tile::Status::FINISH;

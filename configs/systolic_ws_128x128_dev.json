@@ -1,5 +1,5 @@
 {
-    "num_cores": 1,
+    "num_cores": 2,
     "core_type": "systolic_ws",
     "core_freq": 1000,
     "core_width": 128,

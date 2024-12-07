@@ -92,7 +92,7 @@ class NeuPIMSCore {
     cycle_type _stat_softmax_cycle;
 
     int _running_layer;
-    std::deque<std::shared_ptr<Tile>> _tiles;
+    std::deque<std::shared_ptr<Tile>> _tiles; // 이거 사실 엄청 많음.
     std::deque<std::shared_ptr<Tile>> _pim_tiles;
     std::queue<std::shared_ptr<Tile>> _finished_tiles;
 

@@ -18,6 +18,13 @@ Scheduler::Scheduler(SimulationConfig config, const cycle_type* core_cycle)
     _dk = _config.model_n_embd / _config.model_n_head;
     _effective_e = _nh * _dk;
 
+    // EE514
+    _model_programs_SA.resize(config.num_cores);
+    for(uint32_t model_idx = 0; model_idx < _model_programs_SA.size(); model_idx++) {
+        _model_programs_SA[model_idx] = nullptr;
+    }
+    _num_cores = config.num_cores;
+
     // Memory spec init
     _dram_channels = _config.dram_channels;
     _dram_page_size = _config.dram_page_size / _config.precision;
@@ -255,12 +262,22 @@ void Scheduler::make_program() {
     spdlog::info("New Program for SA  (sub-batch.size: {})", sub_batch_on_sa->_reqs.size());
     spdlog::info("New Program for PIM (sub-batch.size: {})", sub_batch_on_pim->_reqs.size());
 
-    _model_program1 =
-        std::make_unique<StageProgram>(_model, sub_batch_on_sa, StagePlatform::SA, _stage);
+    // _model_program1 =
+    //     std::make_unique<StageProgram>(_model, sub_batch_on_sa, StagePlatform::SA, _stage);
     _model_program2 =
         std::make_unique<StageProgram>(_model, sub_batch_on_pim, StagePlatform::PIM, _stage);
 
-    refresh_status1();
+    // EE514
+    spdlog::info("numcores: {}", _num_cores);
+    for(uint32_t core_id = 0; core_id < _num_cores; core_id++) {
+        _model_programs_SA[core_id] = std::make_unique<StageProgram>(_model, sub_batch_on_sa, StagePlatform::SA, _stage);
+        refresh_status_SA(core_id);
+    }
+    // for(uint32_t core_id = 0; core_id < _num_cores; core_id++) {
+        
+    // }
+
+    // refresh_status1();
     refresh_status2();
 }
 
@@ -372,7 +389,9 @@ void Scheduler::init_batches() {
 }
 
 void Scheduler::cycle() {
-    bool step_next_stage = _model_program1 == nullptr && _model_program2 == nullptr;
+    // EE514
+    // bool step_next_stage = _model_program1 == nullptr && _model_program2 == nullptr;
+    bool step_next_stage = empty_all_SA() && _model_program2 == nullptr;
 
     if (step_next_stage && _stage == _init_stage && !_request_queue.empty()) {
         init_batches();
@@ -382,7 +401,9 @@ void Scheduler::cycle() {
     _cycles++;
 
     if (_config.sub_batch_mode) {
-        bool lets_make_program1 = _model_program1 == nullptr && _breq1.size() > 0;
+        // EE514
+        // bool lets_make_program1 = _model_program1 == nullptr && _breq1.size() > 0;
+        bool lets_make_program1 = empty_all_SA() && _breq1.size() > 0;
         bool lets_make_program2 = _model_program2 == nullptr && _breq2.size() > 0;
 
         if (lets_make_program1 && lets_make_program2) {
@@ -400,7 +421,8 @@ void Scheduler::cycle() {
             }
         }
     } else {
-        bool both_program_none = _model_program1 == nullptr && _model_program2 == nullptr;
+        // bool both_program_none = _model_program1 == nullptr && _model_program2 == nullptr;
+        bool both_program_none = empty_all_SA() && _model_program2 == nullptr;
         bool exist_request = _breq2.size() > 0 || _breq1.size() > 0;
         if (both_program_none && exist_request) {
             if (_stage == Stage::Finish) {
@@ -524,10 +546,13 @@ bool Scheduler::finish_tile(uint32_t core_id, Tile& tile) {
 
     spdlog::info("Finish tile stage_platform:{}", stagePlatformToString(tile.stage_platform));
 
-    if (tile.stage_platform == StagePlatform::SA)
-        _model_program1->finish_operation_tile(tile);
-    else
+    if (tile.stage_platform == StagePlatform::SA) {
+        // _model_program1->finish_operation_tile(tile);
+        _model_programs_SA[core_id]->finish_operation_tile(tile);
+    }
+    else {
         _model_program2->finish_operation_tile(tile);
+    }
 
     if (_active_operation_stats[tile.operation_id].remain_tiles == 0) {
         result = true;
@@ -536,27 +561,117 @@ bool Scheduler::finish_tile(uint32_t core_id, Tile& tile) {
         spdlog::info("Total compute time {}",
                      *_core_cycle - _active_operation_stats[tile.operation_id].start_cycle);
 
-        if (tile.stage_platform == StagePlatform::SA)
-            _model_program1->finish_operation(tile.operation_id);
-        else
+        if (tile.stage_platform == StagePlatform::SA) {
+            // _model_program1->finish_operation(tile.operation_id);
+            _model_programs_SA[core_id]->finish_operation(tile.operation_id);
+        }
+        else {
             _model_program2->finish_operation(tile.operation_id);
+        }
 
         _finished_operation_stats[tile.operation_id] = _active_operation_stats[tile.operation_id];
         _active_operation_stats.erase(tile.operation_id);
     }
 
-    if (tile.stage_platform == StagePlatform::SA)
-        refresh_status1();
-    else
+    if (tile.stage_platform == StagePlatform::SA) {
+        // refresh_status1();
+        refresh_status_SA(core_id);
+    }
+    else {
         refresh_status2();
+    }
 
     return result;
+}
+
+// EE514
+bool Scheduler::empty_SA(uint32_t core_id) {
+    return _model_programs_SA[core_id] == nullptr;
+}
+bool Scheduler::empty_all_SA() {
+    bool empty_all = true;
+    for(uint32_t core_id = 0; core_id < _num_cores; core_id++) {
+        empty_all = empty_all && empty_SA(core_id);
+    }
+    return empty_all;
+}
+void Scheduler::finish_program_SA(uint32_t core_id) {
+    spdlog::info("finish_program_SA[{}]: Model finish at {}", core_id, *_core_cycle);
+    _model_programs_SA[core_id]->log();
+
+    _model_programs_SA[core_id] = nullptr;
+    refresh_stage();
+
+    // cleanup_sub_batch(_breq1);
+    // _breq1.clear();
+
+}
+void Scheduler::refresh_status_SA(uint32_t core_id) {
+    if (_model_programs_SA[core_id] != nullptr) {
+        if (_model_programs_SA[core_id] ->check_finish()) {
+            finish_program_SA(core_id);
+            // exit(0);
+        }
+    }
+    // initiate operation
+    // xxx is count_active_operations() == 0 necessary?
+    if (_model_programs_SA[core_id] && _executable_tile_queue1.empty()) {
+        // spdlog::info("executable operation count {}",
+        //              _model_program1->get_executable_operations().size());
+        auto op = _model_programs_SA[core_id]->get_executable_operations().front();
+        spdlog::info("Start operation {}", op->get_name());
+        spdlog::info("Start operation {}", op->get_id());
+        if (count_active_operations()) {
+            // for (auto& op_stat : _active_operation_stats) {
+            //     spdlog::info("op stat currently in is {}", op_stat.second.name);
+            // }
+            if (_active_operation_stats.find(op->get_id()) != _active_operation_stats.end()) {
+                return;
+            }
+        }
+
+        assert(op->get_tiles().size());
+        // _executable_tile_queue1 = op->get_tiles();
+        // EE514
+        std::deque<Tile> op_get_tiles = op->get_tiles();
+        for(Tile &t : op_get_tiles)
+            _executable_tile_queue1.push_back(t);
+
+        // TODO: 이제 이걸 코어 개수에 맞게 골고루 잘라서 타일을 만들어줘야 함..
+        // for(uint32_t core_id = 0; core_id < _num_cores; core_id++) {
+        //     for(Tile &t : op_get_tiles) {
+        //         _executable_tile_queue1.push_back(t);
+        //     }
+        // }
+        spdlog::info("_executable_tile_queue1 size: {}", _executable_tile_queue1.size());
+        _active_operation_stats[op->get_id()] = RunningOperationStat{
+            .id = op->get_id(),
+            .name = op->get_name(),
+            // xxx necessary?
+            // .launched = true,
+            .start_cycle = *_core_cycle,
+            .total_tiles = (uint32_t)_executable_tile_queue1.size(),
+            .remain_tiles = (uint32_t)_executable_tile_queue1.size(),
+            .launched_tiles = 0,
+        };
+    } else {
+        // spdlog::info("is model null {} / is executable tile queue empty {} / count active ops
+        // {}",
+        //              _model_program1 == nullptr, _executable_tile_queue1.empty(),
+        //              count_active_operations());
+        // for (auto& op_stat : _active_operation_stats) {
+        //     spdlog::info("op stat currently in is {}", op_stat.second.name);
+        // }
+    }
 }
 
 bool Scheduler::empty1() { return _model_program1 == nullptr; }
 bool Scheduler::empty2() { return _model_program2 == nullptr; }
 
-bool Scheduler::running() { return !_request_queue.empty() || !_completed_request_queue.empty(); }
+bool Scheduler::running() { 
+    spdlog::info("_request_queue: {}, _completed_request_queue: {}", !_request_queue.empty(), !_completed_request_queue.empty());
+    return !_request_queue.empty() || !_completed_request_queue.empty();
+ }
 
 void Scheduler::cleanup_sub_batch(std::vector<Ptr<InferRequest>> sub_batch) {
     // < todos when the model program has finished >
@@ -594,7 +709,8 @@ void Scheduler::cleanup_sub_batch(std::vector<Ptr<InferRequest>> sub_batch) {
 }
 
 void Scheduler::refresh_stage() {
-    bool stage_done = _model_program1 == nullptr && _model_program2 == nullptr;
+    // bool stage_done = _model_program1 == nullptr && _model_program2 == nullptr;
+    bool stage_done = empty_all_SA() && _model_program2 == nullptr;
     if (stage_done) {
         std::string red = "\033[1;31m";
         std::string reset = "\033[0m";
@@ -624,7 +740,7 @@ void Scheduler::refresh_stage() {
 }
 
 void Scheduler::finish_program1() {
-    spdlog::info("Model finish at {}", *_core_cycle);
+    spdlog::info("Finish_program1: Model finish at {}", *_core_cycle);
     _model_program1->log();
 
     _model_program1 = nullptr;
@@ -635,7 +751,7 @@ void Scheduler::finish_program1() {
 }
 
 void Scheduler::finish_program2() {
-    spdlog::info("Model finish at {}", *_core_cycle);
+    spdlog::info("Finish_program2: Model finish at {}", *_core_cycle);
     _model_program2->log();
 
     _model_program2 = nullptr;
@@ -669,7 +785,16 @@ void Scheduler::refresh_status1() {
         }
 
         assert(op->get_tiles().size());
-        _executable_tile_queue1 = op->get_tiles();
+        // EE514
+        std::deque<Tile> op_get_tiles = op->get_tiles();
+        // TODO: 이제 이걸 코어 개수에 맞게 골고루 잘라서 타일을 만들어줘야 함..
+        // _executable_tile_queue1 = op->get_tiles();
+        for(uint32_t core_id = 0; core_id < 1; core_id++) {
+            for(Tile &t : op_get_tiles) {
+                _executable_tile_queue1.push_back(t);
+            }
+        }
+        spdlog::info("_executable_tile_queue1 size: {}", _executable_tile_queue1.size());
         _active_operation_stats[op->get_id()] = RunningOperationStat{
             .id = op->get_id(),
             .name = op->get_name(),

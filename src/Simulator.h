@@ -53,15 +53,15 @@ class Simulator {
 
     uint64_t _core_cycles;
 
-    uint32_t _cycle_mask;
+    uint64_t _cycle_mask;
     bool _single_run;
     Ptr<Model> _model;
 
     struct StageStat {
         Stage stage;
-        uint32_t done_cycle;
-        uint32_t pim_cycles;
-        uint32_t npu_cycles;
+        uint64_t done_cycle;
+        uint64_t pim_cycles;
+        uint64_t npu_cycles;
         double mem_bw_util;
     };
 

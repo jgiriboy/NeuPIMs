@@ -14,6 +14,10 @@ class Scheduler {
     void get_tile2(uint32_t core_id);
 
     bool finish_tile(uint32_t core_id, Tile &tile);
+
+    // EE514
+    bool empty_SA(uint32_t core_id);
+    bool empty_all_SA();
     bool empty1();
     bool empty2();
     bool running();
@@ -47,6 +51,12 @@ class Scheduler {
 
     const cycle_type *_core_cycle;
     Ptr<Model> _model;
+
+    // EE514
+    std::vector<std::unique_ptr<StageProgram>> _model_programs_SA;
+    uint32_t _num_cores;
+    virtual void refresh_status_SA(uint32_t core_id);
+    void finish_program_SA(uint32_t core_id);
 
     std::unique_ptr<StageProgram> _model_program1;
     std::unique_ptr<StageProgram> _model_program2;

@@ -146,14 +146,28 @@ void Simulator::cycle() {
                 }
 
                 // Issue new tile to core
-                if (_scheduler->empty1() && _scheduler->empty2()) continue;
+                // EE514
+                // if (_scheduler->empty1() && _scheduler->empty2()) continue;
+                if (_scheduler->empty_all_SA() && _scheduler->empty2()) continue;
 
                 // >>> todo: support 2 sub-batch
-                if (!_scheduler->empty1()) {
+                // if (!_scheduler->empty1()) {
+                //     Tile &tile = _scheduler->top_tile1(core_id);
+                //     if ((tile.status != Tile::Status::EMPTY) && _cores[core_id]->can_issue(tile)) {
+                //         if (tile.status == Tile::Status::INITIALIZED) {
+                //             assert(tile.stage_platform == StagePlatform::SA);
+                //             // EE514
+                //             _cores[core_id]->issue(tile);
+                //             _scheduler->get_tile1(core_id);
+                //         }
+                //     }
+                // }
+                if (!_scheduler->empty_SA(core_id)) {
                     Tile &tile = _scheduler->top_tile1(core_id);
                     if ((tile.status != Tile::Status::EMPTY) && _cores[core_id]->can_issue(tile)) {
                         if (tile.status == Tile::Status::INITIALIZED) {
                             assert(tile.stage_platform == StagePlatform::SA);
+                            // EE514
                             _cores[core_id]->issue(tile);
                             _scheduler->get_tile1(core_id);
                         }
@@ -170,6 +184,8 @@ void Simulator::cycle() {
                     }
                 }
                 // <<< todo: support 2 sub-batch
+                // EE514
+                // spdlog::info("core cycling {}", core_id);
                 _cores[core_id]->cycle();
             }
             _core_cycles++;
@@ -268,9 +284,15 @@ bool Simulator::running() {
     running = running || _dram->running();
     running = running || _scheduler->running();
     running = running || _client->running();
-    // if (!_client->running() && _cores[0]->running()) {
+    spdlog::info("core[0] running: {}, core[1] running: {}", _cores[0]->running(), _cores[1]->running());
+    // spdlog::info("icnt running: {}", _icnt->running());
+    // spdlog::info("dram running: {}", _dram->running());
+    spdlog::info("scheduler running: {}", _scheduler->running());
+    spdlog::info("client running: {}", _client->running());
+    // EE514
+    // if (!_client->running() && (_cores[0]->running() || _cores[1]->running())) {
     //     // for debug
-    //     spdlog::info("core[1] running: {}", _cores[0]->running());
+    //     spdlog::info("core[0] running: {}, core[1] running: {}", _cores[0]->running(), _cores[1]->running());
     //     spdlog::info("icnt running: {}", _icnt->running());
     //     spdlog::info("dram running: {}", _dram->running());
     //     spdlog::info("scheduler running: {}", _scheduler->running());
