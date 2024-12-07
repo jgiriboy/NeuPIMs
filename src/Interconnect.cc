@@ -51,7 +51,9 @@ SimpleInterconnect::SimpleInterconnect(SimulationConfig config) : _latency(confi
     _out_buffers.resize(config.num_cores * config.dram_channels);
 
     _mem_sa_q_turn = true;
+    #ifdef TRI
     _mem_req_queue0.resize(config.dram_channels);  // for SA1
+    #endif
     _mem_req_queue1.resize(config.dram_channels);  // for SA2
     _mem_req_queue2.resize(config.dram_channels);  // for PIM
 
@@ -114,7 +116,7 @@ void SimpleInterconnect::cycle() {
                         exit(-1);
                     #else
                     if (mem_req->stage_platform == StagePlatform::SA)
-                        _mem_req_queue0[mem_ch].push(mem_req);
+                        _mem_req_queue1[mem_ch].push(mem_req);
                     else if (mem_req->stage_platform == StagePlatform::PIM)
                         _mem_req_queue2[mem_ch].push(mem_req);
                     else
@@ -187,26 +189,32 @@ void SimpleInterconnect::pop(uint32_t nid) {
 // - memreq_top
 // - memreq_pop
 
+#ifdef TRI
 bool SimpleInterconnect::has_memreq0(uint32_t cid) { return !_mem_req_queue0[cid].empty(); }
-bool SimpleInterconnect::has_memreq1(uint32_t cid) { return !_mem_req_queue1[cid].empty(); }
-bool SimpleInterconnect::has_memreq2(uint32_t cid) { return !_mem_req_queue2[cid].empty(); }
 
 MemoryAccess *SimpleInterconnect::memreq_top0(uint32_t cid) {
     assert(has_memreq0(cid));
     return _mem_req_queue0[cid].front();
 }
-MemoryAccess *SimpleInterconnect::memreq_top1(uint32_t cid) {
-    assert(has_memreq1(cid));
-    return _mem_req_queue1[cid].front();
-}
-MemoryAccess *SimpleInterconnect::memreq_top2(uint32_t cid) {
-    assert(has_memreq2(cid));
-    return _mem_req_queue2[cid].front();
-}
 
 void SimpleInterconnect::memreq_pop0(uint32_t cid) {
     assert(has_memreq0(cid));
     _mem_req_queue0[cid].pop();
+
+}
+
+#endif
+bool SimpleInterconnect::has_memreq1(uint32_t cid) { return !_mem_req_queue1[cid].empty(); }
+bool SimpleInterconnect::has_memreq2(uint32_t cid) { return !_mem_req_queue2[cid].empty(); }
+
+MemoryAccess *SimpleInterconnect::memreq_top1(uint32_t cid) {
+    assert(has_memreq1(cid));
+    return _mem_req_queue1[cid].front();
+}
+
+MemoryAccess *SimpleInterconnect::memreq_top2(uint32_t cid) {
+    assert(has_memreq2(cid));
+    return _mem_req_queue2[cid].front();
 }
 
 void SimpleInterconnect::memreq_pop1(uint32_t cid) {
