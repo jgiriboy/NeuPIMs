@@ -19,10 +19,13 @@ class Interconnect {
     virtual void pop(uint32_t nid) = 0;
     virtual void print_stats() = 0;
 
+    virtual bool has_memreq0(uint32_t cid) = 0;
     virtual bool has_memreq1(uint32_t cid) = 0;
     virtual bool has_memreq2(uint32_t cid) = 0;
+    virtual MemoryAccess *memreq_top0(uint32_t cid) = 0;
     virtual MemoryAccess *memreq_top1(uint32_t cid) = 0;
     virtual MemoryAccess *memreq_top2(uint32_t cid) = 0;
+    virtual void memreq_pop0(uint32_t cid) = 0;
     virtual void memreq_pop1(uint32_t cid) = 0;
     virtual void memreq_pop2(uint32_t cid) = 0;
 
@@ -55,10 +58,13 @@ class SimpleInterconnect : public Interconnect {
     virtual void pop(uint32_t nid) override;
     virtual void print_stats() override {}
 
+    virtual bool has_memreq0(uint32_t cid) override;
     virtual bool has_memreq1(uint32_t cid) override;
     virtual bool has_memreq2(uint32_t cid) override;
+    virtual MemoryAccess *memreq_top0(uint32_t cid) override;
     virtual MemoryAccess *memreq_top1(uint32_t cid) override;
     virtual MemoryAccess *memreq_top2(uint32_t cid) override;
+    virtual void memreq_pop0(uint32_t cid) override;
     virtual void memreq_pop1(uint32_t cid) override;
     virtual void memreq_pop2(uint32_t cid) override;
 
@@ -79,7 +85,8 @@ class SimpleInterconnect : public Interconnect {
     std::vector<bool> _busy_node;
 
     // memory request queue
-    bool _mem_sa_q_turn;  // for checking queue1, queue2 in turn
+    bool _mem_sa_q_turn;  // for checking queue0, queue1, queue2 in turn
+    std::vector<std::queue<MemoryAccess *>> _mem_req_queue0;
     std::vector<std::queue<MemoryAccess *>> _mem_req_queue1;
     std::vector<std::queue<MemoryAccess *>> _mem_req_queue2;
 };

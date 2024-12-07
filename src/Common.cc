@@ -282,7 +282,7 @@ void initialize_system_config(std::string sys_config_path) {
     Config::global_config.max_active_reqs = sys_config["max_active_reqs"];
     Config::global_config.max_batch_size = sys_config["max_batch_size"];
 
-    Config::global_config.sub_batch_mode = sys_config["sub_batch_mode"];
+    Config::global_config.sub_batch_mode = sys_config["sub_batch_mode"]; // [TODO] tri_batch_mode?
 }
 
 json load_config(std::string config_path) {
@@ -569,8 +569,11 @@ uint64_t AddressConfig::encode_pim_comps_readres(int ch, int row, int num_comps,
 // used for sub-batch interleaving
 std::string stageToString(Stage stage) {
     static const std::map<Stage, std::string> stageMap = {
-        {Stage::A, "A"}, {Stage::B, "B"}, {Stage::C, "C"},           {Stage::D, "D"},
-        {Stage::E, "E"}, {Stage::F, "F"}, {Stage::Finish, "Finish"},
+        {Stage::A, "A"}, {Stage::B, "B"}, {Stage::C, "C"}, {Stage::D, "D"},
+        {Stage::E, "E"}, {Stage::F, "F"}, {Stage::G, "G"}, {Stage::H, "H"},
+        {Stage::I, "I"}, {Stage::J, "J"}, {Stage::K, "K"}, {Stage::L, "L"},
+        {Stage::M, "M"}, {Stage::N, "N"}, {Stage::O, "O"}, {Stage::P, "P"},
+        {Stage::Finish, "Finish"},
     };
 
     auto it = stageMap.find(stage);
@@ -579,7 +582,8 @@ std::string stageToString(Stage stage) {
 
 std::string stagePlatformToString(StagePlatform sp) {
     static const std::map<StagePlatform, std::string> spMap = {
-        {StagePlatform::SA, "SA"},
+        {StagePlatform::SA1, "SA1"},
+        {StagePlatform::SA2, "SA2"},
         {StagePlatform::PIM, "PIM"},
     };
 
