@@ -163,13 +163,15 @@ void Simulator::cycle() {
                 //     }
                 // }
                 if (!_scheduler->empty_SA(core_id)) {
-                    Tile &tile = _scheduler->top_tile1(core_id);
+                    // Tile &tile = _scheduler->top_tile1(core_id);
+                    Tile &tile = _scheduler->top_tile_SA(core_id);
                     if ((tile.status != Tile::Status::EMPTY) && _cores[core_id]->can_issue(tile)) {
                         if (tile.status == Tile::Status::INITIALIZED) {
                             assert(tile.stage_platform == StagePlatform::SA);
                             // EE514
                             _cores[core_id]->issue(tile);
-                            _scheduler->get_tile1(core_id);
+                            // _scheduler->get_tile1(core_id);
+                            _scheduler->get_tile_SA(core_id);
                         }
                     }
                 }
@@ -284,11 +286,11 @@ bool Simulator::running() {
     running = running || _dram->running();
     running = running || _scheduler->running();
     running = running || _client->running();
-    spdlog::info("core[0] running: {}, core[1] running: {}", _cores[0]->running(), _cores[1]->running());
+    // spdlog::info("core[0] running: {}, core[1] running: {}", _cores[0]->running(), _cores[1]->running());
     // spdlog::info("icnt running: {}", _icnt->running());
     // spdlog::info("dram running: {}", _dram->running());
-    spdlog::info("scheduler running: {}", _scheduler->running());
-    spdlog::info("client running: {}", _client->running());
+    // spdlog::info("scheduler running: {}", _scheduler->running());
+    // spdlog::info("client running: {}", _client->running());
     // EE514
     // if (!_client->running() && (_cores[0]->running() || _cores[1]->running())) {
     //     // for debug

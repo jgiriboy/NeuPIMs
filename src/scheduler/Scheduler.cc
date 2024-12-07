@@ -20,8 +20,9 @@ Scheduler::Scheduler(SimulationConfig config, const cycle_type* core_cycle)
 
     // EE514
     _model_programs_SA.resize(config.num_cores);
-    for(uint32_t model_idx = 0; model_idx < _model_programs_SA.size(); model_idx++) {
-        _model_programs_SA[model_idx] = nullptr;
+    _executable_tile_queue_SA.resize(config.num_cores);
+    for(uint32_t idx = 0; idx < config.num_cores; idx++) {
+        _model_programs_SA[idx] = nullptr;
     }
     _num_cores = config.num_cores;
 
@@ -595,6 +596,43 @@ bool Scheduler::empty_all_SA() {
     }
     return empty_all;
 }
+Tile& Scheduler::top_tile_SA(uint32_t core_id) {
+    static Tile empty_tile = Tile{.status = Tile::Status::EMPTY};
+    if (_executable_tile_queue_SA[core_id].empty()) {
+        return empty_tile;
+    } else {
+        Tile& tile = _executable_tile_queue_SA[core_id].front();
+        if (tile.status == Tile::Status::BAR) {
+            return empty_tile;
+        } else {
+            tile.stage_platform = StagePlatform::SA;
+            return tile;
+        }
+    }
+}
+void Scheduler::get_tile_SA(uint32_t core_id) {
+    if (_executable_tile_queue_SA[core_id].empty()) {
+        return;
+    } else {
+        Tile& tile = _executable_tile_queue_SA[core_id].front();
+        if (tile.status == Tile::Status::BAR) {
+            RunningOperationStat stat = _finished_operation_stats[tile.operation_id];
+            if (stat.launched_tiles + stat.remain_tiles == stat.total_tiles) {
+                /* POP only if all lauched tiles are finished */
+                _executable_tile_queue_SA[core_id].pop_front();
+                _finished_operation_stats[tile.operation_id].launched_tiles++;
+                _finished_operation_stats[tile.operation_id].remain_tiles--;
+            }
+            return;
+        } else {
+            _active_operation_stats[tile.operation_id].launched_tiles++;
+            _executable_tile_queue_SA[core_id].pop_front();
+            spdlog::debug("Operation {} Core {} Get Tile at {}", tile.optype, core_id,
+                          *_core_cycle);
+            return;
+        }
+    }
+}
 void Scheduler::finish_program_SA(uint32_t core_id) {
     spdlog::info("finish_program_SA[{}]: Model finish at {}", core_id, *_core_cycle);
     _model_programs_SA[core_id]->log();
@@ -615,7 +653,7 @@ void Scheduler::refresh_status_SA(uint32_t core_id) {
     }
     // initiate operation
     // xxx is count_active_operations() == 0 necessary?
-    if (_model_programs_SA[core_id] && _executable_tile_queue1.empty()) {
+    if (_model_programs_SA[core_id] && _executable_tile_queue_SA[core_id].empty()) {
         // spdlog::info("executable operation count {}",
         //              _model_program1->get_executable_operations().size());
         auto op = _model_programs_SA[core_id]->get_executable_operations().front();
@@ -632,26 +670,26 @@ void Scheduler::refresh_status_SA(uint32_t core_id) {
 
         assert(op->get_tiles().size());
         // _executable_tile_queue1 = op->get_tiles();
-        // EE514
-        std::deque<Tile> op_get_tiles = op->get_tiles();
-        for(Tile &t : op_get_tiles)
-            _executable_tile_queue1.push_back(t);
+        _executable_tile_queue_SA[0] = _executable_tile_queue_SA[1] = op->get_tiles();
 
-        // TODO: 이제 이걸 코어 개수에 맞게 골고루 잘라서 타일을 만들어줘야 함..
-        // for(uint32_t core_id = 0; core_id < _num_cores; core_id++) {
-        //     for(Tile &t : op_get_tiles) {
-        //         _executable_tile_queue1.push_back(t);
-        //     }
-        // }
-        spdlog::info("_executable_tile_queue1 size: {}", _executable_tile_queue1.size());
+        spdlog::info("_executable_tile_queue[{}] size: {}", core_id, _executable_tile_queue_SA[core_id].size());
+        uint32_t total_ti = 0;
+        uint32_t remain_ti = 0;
+        for(uint32_t i = 0; i < _num_cores; i++) {
+            total_ti += (uint32_t)_executable_tile_queue_SA[i].size();
+            remain_ti += (uint32_t)_executable_tile_queue_SA[i].size();
+        }
+
         _active_operation_stats[op->get_id()] = RunningOperationStat{
             .id = op->get_id(),
             .name = op->get_name(),
             // xxx necessary?
             // .launched = true,
             .start_cycle = *_core_cycle,
-            .total_tiles = (uint32_t)_executable_tile_queue1.size(),
-            .remain_tiles = (uint32_t)_executable_tile_queue1.size(),
+            // .total_tiles = (uint32_t)_executable_tile_queue1.size(),
+            // .remain_tiles = (uint32_t)_executable_tile_queue1.size(),
+            .total_tiles = total_ti,
+            .remain_tiles = remain_ti,
             .launched_tiles = 0,
         };
     } else {
