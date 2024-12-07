@@ -595,7 +595,6 @@ std::string stageToString(Stage stage) {
 #ifdef TRI
 std::string stagePlatformToString(StagePlatform sp) {
     static const std::map<StagePlatform, std::string> spMap = {
-        {StagePlatform::SASA, "SASA"},
         {StagePlatform::SA1, "SA1"},
         {StagePlatform::SA2, "SA2"},
         {StagePlatform::PIM, "PIM"},

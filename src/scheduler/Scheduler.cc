@@ -254,6 +254,11 @@ void Scheduler::make_program() {
     #ifdef TRI
     switch(_stage)
     {
+        case Stage::A:
+            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);   // exception
+            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
+            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq3);  // exception
+            break;
         case Stage::F:
             sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
             sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq2);
@@ -290,7 +295,7 @@ void Scheduler::make_program() {
     }
 
     spdlog::info("New Program for SA1 (sub-batch.size: {})", sub_batch_on_sa->_reqs.size());
-    spdlog::info("New Program for SA2  (sub-batch.size: {})", sub_batch_on_sa_2->_reqs.size());
+    spdlog::info("New Program for SA2 (sub-batch.size: {})", sub_batch_on_sa_2->_reqs.size());
     spdlog::info("New Program for PIM (sub-batch.size: {})", sub_batch_on_pim->_reqs.size());
 
     _model_program1 =

@@ -40,7 +40,7 @@
 #define ACCUM_SPAD_BASE 0x20000000
 #define GARBAGE_ADDR 0xFFFFFFFFFFFFFFF
 #define KB *1024
-// #define TRI
+#define TRI
 
 #define PAGE_SIZE 4096
 
@@ -292,7 +292,7 @@ int LogBase2(int power_of_two);
 // for Sub-batch interleaving
 #ifdef TRI
 enum class Stage { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Finish};
-enum class StagePlatform { SASA, SA1, SA2, PIM, SIZE };
+enum class StagePlatform { SA1, SA2, PIM, SIZE };
 #else
 enum class Stage { A, B, C, D, E, F, Finish };
 enum class StagePlatform { SA, PIM, SIZE };

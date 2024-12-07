@@ -75,7 +75,7 @@ void SystolicWS::cycle() {
             auto accesses = MemoryAccess::from_instruction(
                 front, generate_mem_access_id(), _config.dram_req_size, MemoryAccessType::READ,
                 true, _id, _core_cycle, buffer_id,
-                StagePlatform::SASA);  // todo: change platform to proper
+                StagePlatform::SA1);  // todo: change platform to proper   // SASA?
             #else
             auto accesses = MemoryAccess::from_instruction(
                 front, generate_mem_access_id(), _config.dram_req_size, MemoryAccessType::READ,
@@ -111,7 +111,7 @@ void SystolicWS::cycle() {
 
             #ifdef TRI
             MemoryAccess *mem_request = TransToMemoryAccess(
-                front, _config.dram_req_size, _id, _core_cycle, buffer_id, StagePlatform::SASA);
+                front, _config.dram_req_size, _id, _core_cycle, buffer_id, StagePlatform::SA1);   // SASA?
             #else
             MemoryAccess *mem_request = TransToMemoryAccess(
                 front, _config.dram_req_size, _id, _core_cycle, buffer_id, StagePlatform::SA);
@@ -147,7 +147,7 @@ void SystolicWS::cycle() {
             #ifdef TRI
             auto accesses = MemoryAccess::from_instruction(
                 front, generate_mem_access_id(), _config.dram_req_size, MemoryAccessType::WRITE,
-                true, _id, _core_cycle, buffer_id, StagePlatform::SASA);
+                true, _id, _core_cycle, buffer_id, StagePlatform::SA1);   // SASA?
             #else
             auto accesses = MemoryAccess::from_instruction(
                 front, generate_mem_access_id(), _config.dram_req_size, MemoryAccessType::WRITE,
