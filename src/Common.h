@@ -290,8 +290,8 @@ int LogBase2(int power_of_two);
 
 // for Sub-batch interleaving
 // [TODO] more Stages
-enum class Stage { A, B, C, D, E, F, Finish };
-enum class StagePlatform { SA, PIM, SIZE };
+enum class Stage { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Finish };
+enum class StagePlatform { SA1, SA2, PIM, SIZE }; // remove SA
 std::string stageToString(Stage stage);
 std::string stagePlatformToString(StagePlatform sp);
 //
