@@ -580,6 +580,16 @@ std::string stageToString(Stage stage) {
     auto it = stageMap.find(stage);
     return (it != stageMap.end()) ? it->second : "unknown";
 }
+#else
+std::string stageToString(Stage stage) {
+    static const std::map<Stage, std::string> stageMap = {
+        {Stage::A, "A"}, {Stage::B, "B"}, {Stage::C, "C"}, {Stage::D, "D"},
+        {Stage::E, "E"}, {Stage::F, "F"}, {Stage::Finish, "Finish"},
+    };
+
+    auto it = stageMap.find(stage);
+    return (it != stageMap.end()) ? it->second : "unknown";
+}
 #endif
 
 #ifdef TRI
@@ -597,8 +607,7 @@ std::string stagePlatformToString(StagePlatform sp) {
 #else
 std::string stagePlatformToString(StagePlatform sp) {
     static const std::map<StagePlatform, std::string> spMap = {
-        {StagePlatform::SA1, "SA1"},
-        {StagePlatform::SA2, "SA2"},
+        {StagePlatform::SA, "SA"},
         {StagePlatform::PIM, "PIM"},
     };
 
