@@ -18,6 +18,9 @@ class Scheduler {
     bool empty2();
     bool running();
 
+    bool empty_SA(uint32_t core_id);
+    bool empty_all_SAs();
+
     void print_stat();
 
     bool has_stage_changed() { return _has_stage_changed; }
@@ -48,9 +51,13 @@ class Scheduler {
     const cycle_type *_core_cycle;
     Ptr<Model> _model;
 
-    std::unique_ptr<StageProgram> _model_program1;
+    /* new! */
+    std::vector<std::unique_ptr<StageProgram>> _SA_model_programs;
+    // std::vector<std::deque<Tile>> _SA_executable_tile_queue;
+    
+    std::unique_ptr<StageProgram> _model_program1; // TODO: remove
     std::unique_ptr<StageProgram> _model_program2;
-    std::deque<Tile> _executable_tile_queue1;
+    std::deque<Tile> _executable_tile_queue1; // TODO: remove
     std::deque<Tile> _executable_tile_queue2;
 
     SimulationConfig _config;
@@ -61,7 +68,7 @@ class Scheduler {
     Stage _prev_stage;  // for stat
     bool _has_stage_changed;
 
-    virtual void refresh_status1();
+    virtual void refresh_status1(uint32_t core_id);
     virtual void refresh_status2();
 
     uint32_t count_active_operations();

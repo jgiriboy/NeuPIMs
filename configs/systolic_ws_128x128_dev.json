@@ -12,7 +12,7 @@
             "accum_spad_size": 1024,
             "__sram_size": 7168,
 
-            "sram_size": 134218,
+            "sram_size": 134217,
             "sram_width": 128,
 
             "process_bit": 32,

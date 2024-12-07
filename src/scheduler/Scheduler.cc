@@ -28,6 +28,13 @@ Scheduler::Scheduler(SimulationConfig config, const cycle_type* core_cycle)
     _model_program1 = nullptr;
     _model_program2 = nullptr;
 
+    _SA_model_programs.resize(_config.num_cores);
+    // _SA_executable_tile_queue.resize(_config.num_cores);
+    for(std::unique_ptr<StageProgram> &e : _SA_model_programs) {
+        e = nullptr;
+    }
+
+
     _init_stage = Stage::A;
     // _init_stage = Stage::C;
     _stage = _init_stage;
@@ -260,7 +267,12 @@ void Scheduler::make_program() {
     _model_program2 =
         std::make_unique<StageProgram>(_model, sub_batch_on_pim, StagePlatform::PIM, _stage);
 
-    refresh_status1();
+    for(uint32_t i = 0; i < _SA_model_programs.size(); i++) {
+        _SA_model_programs[i] = std::make_unique<StageProgram>(_model, sub_batch_on_sa, StagePlatform::SA, _stage);
+        refresh_status1(i);
+    }
+
+    
     refresh_status2();
 }
 
@@ -372,7 +384,8 @@ void Scheduler::init_batches() {
 }
 
 void Scheduler::cycle() {
-    bool step_next_stage = _model_program1 == nullptr && _model_program2 == nullptr;
+    // bool step_next_stage = _model_program1 == nullptr && _model_program2 == nullptr;
+    bool step_next_stage = empty_all_SAs() && (_model_program2 == nullptr);
 
     if (step_next_stage && _stage == _init_stage && !_request_queue.empty()) {
         init_batches();
@@ -382,7 +395,8 @@ void Scheduler::cycle() {
     _cycles++;
 
     if (_config.sub_batch_mode) {
-        bool lets_make_program1 = _model_program1 == nullptr && _breq1.size() > 0;
+        // bool lets_make_program1 = _model_program1 == nullptr && _breq1.size() > 0;
+        bool lets_make_program1 = empty_all_SAs() && _breq1.size() > 0;
         bool lets_make_program2 = _model_program2 == nullptr && _breq2.size() > 0;
 
         if (lets_make_program1 && lets_make_program2) {
@@ -400,7 +414,8 @@ void Scheduler::cycle() {
             }
         }
     } else {
-        bool both_program_none = _model_program1 == nullptr && _model_program2 == nullptr;
+        // bool both_program_none = _model_program1 == nullptr && _model_program2 == nullptr;
+        bool both_program_none = empty_all_SAs() && _model_program2 == nullptr;
         bool exist_request = _breq2.size() > 0 || _breq1.size() > 0;
         if (both_program_none && exist_request) {
             if (_stage == Stage::Finish) {
@@ -524,8 +539,12 @@ bool Scheduler::finish_tile(uint32_t core_id, Tile& tile) {
 
     spdlog::info("Finish tile stage_platform:{}", stagePlatformToString(tile.stage_platform));
 
-    if (tile.stage_platform == StagePlatform::SA)
-        _model_program1->finish_operation_tile(tile);
+    // if (tile.stage_platform == StagePlatform::SA) 
+    //     _model_program1->finish_operation_tile(tile);
+    // else
+    //     _model_program2->finish_operation_tile(tile);
+    if (tile.stage_platform == StagePlatform::SA)  
+        _SA_model_programs[core_id]->finish_operation_tile(tile);
     else
         _model_program2->finish_operation_tile(tile);
 
@@ -536,8 +555,12 @@ bool Scheduler::finish_tile(uint32_t core_id, Tile& tile) {
         spdlog::info("Total compute time {}",
                      *_core_cycle - _active_operation_stats[tile.operation_id].start_cycle);
 
+        // if (tile.stage_platform == StagePlatform::SA)
+        //     _model_program1->finish_operation(tile.operation_id);
+        // else
+        //     _model_program2->finish_operation(tile.operation_id);
         if (tile.stage_platform == StagePlatform::SA)
-            _model_program1->finish_operation(tile.operation_id);
+            _SA_model_programs[core_id]->finish_operation(tile.operation_id);
         else
             _model_program2->finish_operation(tile.operation_id);
 
@@ -546,11 +569,24 @@ bool Scheduler::finish_tile(uint32_t core_id, Tile& tile) {
     }
 
     if (tile.stage_platform == StagePlatform::SA)
-        refresh_status1();
+        refresh_status1(core_id);
     else
         refresh_status2();
 
     return result;
+}
+
+bool Scheduler::empty_SA(uint32_t core_id) {
+    return _SA_model_programs[core_id] == nullptr;
+}
+
+bool Scheduler::empty_all_SAs() {
+    bool sa_empty = true;
+    for(uint32_t i = 0; i < _SA_model_programs.size(); i++) {
+        sa_empty = _SA_model_programs[i] == nullptr;
+        if(!sa_empty) break;
+    }
+    return sa_empty;
 }
 
 bool Scheduler::empty1() { return _model_program1 == nullptr; }
@@ -594,7 +630,8 @@ void Scheduler::cleanup_sub_batch(std::vector<Ptr<InferRequest>> sub_batch) {
 }
 
 void Scheduler::refresh_stage() {
-    bool stage_done = _model_program1 == nullptr && _model_program2 == nullptr;
+    // bool stage_done = _model_program1 == nullptr && _model_program2 == nullptr;
+    bool stage_done = empty_all_SAs() && _model_program2 == nullptr;
     if (stage_done) {
         std::string red = "\033[1;31m";
         std::string reset = "\033[0m";
@@ -625,9 +662,14 @@ void Scheduler::refresh_stage() {
 
 void Scheduler::finish_program1() {
     spdlog::info("Model finish at {}", *_core_cycle);
-    _model_program1->log();
+    // _model_program1->log();
 
-    _model_program1 = nullptr;
+    // _model_program1 = nullptr;
+    
+    for(uint32_t i = 0; i < _SA_model_programs.size(); i++) {
+        _SA_model_programs[i]->log();
+        _SA_model_programs[i] = nullptr;
+    }
     refresh_stage();
 
     // cleanup_sub_batch(_breq1);
@@ -645,19 +687,26 @@ void Scheduler::finish_program2() {
     // _breq2.clear();
 }
 
-void Scheduler::refresh_status1() {
-    if (_model_program1 != nullptr) {
-        if (_model_program1->check_finish()) {
+void Scheduler::refresh_status1(uint32_t core_id) {
+    // if (_model_program1 != nullptr) {
+    //     if (_model_program1->check_finish()) {
+    //         finish_program1();
+    //         // exit(0);
+    //     }
+    // }
+
+    if (_SA_model_programs[core_id] != nullptr) {
+        if (_SA_model_programs[core_id]->check_finish()) {
             finish_program1();
             // exit(0);
         }
     }
     // initiate operation
     // xxx is count_active_operations() == 0 necessary?
-    if (_model_program1 != nullptr && _executable_tile_queue1.empty()) {
+    if (_SA_model_programs[core_id] != nullptr && _executable_tile_queue1.empty()) {
         // spdlog::info("executable operation count {}",
         //              _model_program1->get_executable_operations().size());
-        auto op = _model_program1->get_executable_operations().front();
+        auto op = _SA_model_programs[core_id]->get_executable_operations().front();
         spdlog::info("Start operation {}", op->get_name());
         if (count_active_operations()) {
             // for (auto& op_stat : _active_operation_stats) {

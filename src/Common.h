@@ -161,7 +161,6 @@ struct Tile {
     bool skip;
     int spad_id;
     int accum_spad_id;
-
     // initialized when Tile moves into core.
 
     // count up when MOVIN op exists,

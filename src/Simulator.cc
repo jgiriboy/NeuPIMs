@@ -146,11 +146,24 @@ void Simulator::cycle() {
                 }
 
                 // Issue new tile to core
-                if (_scheduler->empty1() && _scheduler->empty2())
+                // if (_scheduler->empty1() && _scheduler->empty2())
+                //     continue;
+                if (_scheduler->empty_all_SAs() && _scheduler->empty2())
                     continue;
-
+            
+                // EE514 Note: 요기가 issue를 하는 부분인 것 같다.
                 // >>> todo: support 2 sub-batch
-                if (!_scheduler->empty1()) {
+                // if (!_scheduler->empty1()) {
+                //     Tile &tile = _scheduler->top_tile1(core_id);
+                //     if ((tile.status != Tile::Status::EMPTY) && _cores[core_id]->can_issue(tile)) {
+                //         if (tile.status == Tile::Status::INITIALIZED) {
+                //             assert(tile.stage_platform == StagePlatform::SA);
+                //             _cores[core_id]->issue(tile);
+                //             _scheduler->get_tile1(core_id);
+                //         }
+                //     }
+                // }
+                if (!_scheduler->empty_SA(core_id)) {
                     Tile &tile = _scheduler->top_tile1(core_id);
                     if ((tile.status != Tile::Status::EMPTY) && _cores[core_id]->can_issue(tile)) {
                         if (tile.status == Tile::Status::INITIALIZED) {

@@ -72,6 +72,7 @@ void Model::init_params() {
         auto attn = name_gen(LAYER(i), BlockType::Attention); // layer0.attn
         
         // layer0.attn.ln
+        // EE514 Note: 이미 n_tp로 weight dimension을 나눠주고 있다. TP는 적용되어 있는 것 같다.
         create_weight(name_gen(attn, OperationType::LayerNorm, ParameterType::Weight),
                       {_config.model_n_embd});
         create_weight(name_gen(attn, OperationType::LayerNorm, ParameterType::Bias),
