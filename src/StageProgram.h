@@ -40,15 +40,20 @@ class StageProgram {
     StagePlatform _stage_platform;
     Stage _stage;
 
-    void init_SA_program();
+    void init_SA1_program();
+    void init_SA2_program();
     void init_PIM_program();
 
-    bool enable_proj_ffns();
+ // Conditional Checks
+    bool skip_PIM_stage();
+    bool skip_SA1_stage();
+    bool skip_SA2_stage();
     bool enable_qkv_gen();
-    bool skip_pim_stage();
-
-    // Add the declaration of the new function and enum usage
-    StageType get_stage_type();
+    bool enable_proj();
+    bool enable_ffn1s();
+    bool enable_ffn2s();
+    bool enable_logit_softmax();
+    bool enable_attend();
 
     std::vector<Ptr<BTensor>> projection_block(std::vector<Ptr<BTensor>> inputs);
     std::vector<Ptr<BTensor>> ffn1_block(std::vector<Ptr<BTensor>> inputs);
