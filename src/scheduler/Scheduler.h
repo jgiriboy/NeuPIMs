@@ -24,6 +24,7 @@ class Scheduler {
     bool empty1();
     bool empty2();
     bool running();
+    virtual void cleanup_SA();
 
     void print_stat();
 

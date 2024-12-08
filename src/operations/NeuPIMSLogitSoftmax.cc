@@ -100,12 +100,12 @@ Tile NeuPIMSLogitSoftmax::initialize_instructions(int start, int end) {
             uint32_t seq_len = query->get_dims()[1];
             assert(seq_len == key->get_dims()[2]);
 
-            for (int h_idx = 0; h_idx < _nh; h_idx++) {
+            for (uint32_t h_idx = 0; h_idx < _nh; h_idx++) {
                 std::vector<addr_type> dram_query_addrs;
                 std::vector<addr_type> dram_key_addrs;
 
-                for (int dk_idx = 0; dk_idx < _dk; dk_idx++) {
-                    for (int seq_idx = 0; seq_idx < seq_len; seq_idx++) {
+                for (uint32_t dk_idx = 0; dk_idx < _dk; dk_idx++) {
+                    for (uint32_t seq_idx = 0; seq_idx < seq_len; seq_idx++) {
                         dram_query_addrs.push_back(
                             query->get_addr(std::vector<uint32_t>{h_idx, seq_idx, dk_idx}));
                         dram_key_addrs.push_back(

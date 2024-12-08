@@ -669,16 +669,60 @@ void Scheduler::refresh_status_SA(uint32_t core_id) {
         }
 
         assert(op->get_tiles().size());
-        // _executable_tile_queue1 = op->get_tiles();
-        _executable_tile_queue_SA[0] = _executable_tile_queue_SA[1] = op->get_tiles();
 
-        spdlog::info("_executable_tile_queue[{}] size: {}", core_id, _executable_tile_queue_SA[core_id].size());
-        uint32_t total_ti = 0;
-        uint32_t remain_ti = 0;
-        for(uint32_t i = 0; i < _num_cores; i++) {
-            total_ti += (uint32_t)_executable_tile_queue_SA[i].size();
-            remain_ti += (uint32_t)_executable_tile_queue_SA[i].size();
+        // _executable_tile_queue1 = op->get_tiles();
+        Tile tile1 = op->get_tiles().front();
+        Tile tile2 = tile1;
+        tile2.operation_id = tile1.operation_id + 1;
+
+        uint32_t n_instr = tile1.instructions.size();
+        spdlog::info("insruction size: {}", n_instr);
+        // [0, pivot], [pivot+1, size-1]
+        uint32_t pivot = n_instr / 2;
+        if (pivot % 2 == 1)
+            pivot = pivot+1;
+
+        bool dq_pushed = false;
+        for(uint32_t i = pivot; i < n_instr; i+=2) {
+            auto instr1 = tile1.instructions.front();
+            tile1.instructions.pop_front();
+            auto instr2 = tile1.instructions.front();
+            tile1.instructions.pop_front();
+
+            if(!dq_pushed) {
+                tile1.instructions.push_back(instr1);
+                tile1.instructions.push_back(instr2);
+                dq_pushed = true;
+            } else {
+                dq_pushed = false;
+            }
         }
+        
+        dq_pushed = true;
+        for(uint32_t i = 0; i < pivot; i+=2) {
+            auto instr1 = tile2.instructions.front();
+            tile2.instructions.pop_front();
+            auto instr2 = tile2.instructions.front();
+            tile2.instructions.pop_front();
+
+            if(!dq_pushed) {
+                tile2.instructions.push_back(instr1);
+                tile2.instructions.push_back(instr2);
+                dq_pushed = true;
+            } else {
+                dq_pushed = false;
+            }
+        }
+            
+        
+        std::deque<Tile> tile1_dq, tile2_dq;
+        tile1_dq.push_back(tile1);
+        tile2_dq.push_back(tile2);
+       
+        _executable_tile_queue_SA[0] = tile1_dq;
+        _executable_tile_queue_SA[1] = tile2_dq;
+        spdlog::info("tile1 instr size: {}", _executable_tile_queue_SA[0].front().instructions.size());
+        spdlog::info("tile2 instr size: {}", _executable_tile_queue_SA[1].front().instructions.size());
 
         _active_operation_stats[op->get_id()] = RunningOperationStat{
             .id = op->get_id(),
@@ -688,8 +732,8 @@ void Scheduler::refresh_status_SA(uint32_t core_id) {
             .start_cycle = *_core_cycle,
             // .total_tiles = (uint32_t)_executable_tile_queue1.size(),
             // .remain_tiles = (uint32_t)_executable_tile_queue1.size(),
-            .total_tiles = total_ti,
-            .remain_tiles = remain_ti,
+            .total_tiles = (uint32_t)_executable_tile_queue_SA[core_id].size(),
+            .remain_tiles = (uint32_t)_executable_tile_queue_SA[core_id].size(),
             .launched_tiles = 0,
         };
     } else {
@@ -707,9 +751,18 @@ bool Scheduler::empty1() { return _model_program1 == nullptr; }
 bool Scheduler::empty2() { return _model_program2 == nullptr; }
 
 bool Scheduler::running() { 
-    spdlog::info("_request_queue: {}, _completed_request_queue: {}", !_request_queue.empty(), !_completed_request_queue.empty());
+    // spdlog::info("_request_queue: {}, _completed_request_queue: {}", !_request_queue.empty(), !_completed_request_queue.empty());
     return !_request_queue.empty() || !_completed_request_queue.empty();
  }
+
+void Scheduler::cleanup_SA() {
+    while(!_request_queue.empty()) _request_queue.pop_back();
+    while(!_completed_request_queue.empty()) _completed_request_queue.pop();
+
+    for(uint32_t i = 0; i < _num_cores; i++) {
+        finish_program_SA(i);
+    }
+}
 
 void Scheduler::cleanup_sub_batch(std::vector<Ptr<InferRequest>> sub_batch) {
     // < todos when the model program has finished >

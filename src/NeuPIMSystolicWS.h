@@ -3,7 +3,7 @@
 class NeuPIMSystolicWS : public NeuPIMSCore {
    public:
     NeuPIMSystolicWS(uint32_t id, SimulationConfig config);
-    virtual void cycle() override;
+    virtual bool cycle() override;
     virtual void print_stats() override;
     virtual void log() override;
 

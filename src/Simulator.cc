@@ -138,6 +138,7 @@ void Simulator::cycle() {
             }
             _scheduler->cycle();
 
+            bool something_finish = false;
             for (int core_id = 0; core_id < _n_cores; core_id++) {
                 auto finished_tile = _cores[core_id]->pop_finished_tile();
                 if (finished_tile == nullptr) {
@@ -163,14 +164,12 @@ void Simulator::cycle() {
                 //     }
                 // }
                 if (!_scheduler->empty_SA(core_id)) {
-                    // Tile &tile = _scheduler->top_tile1(core_id);
                     Tile &tile = _scheduler->top_tile_SA(core_id);
                     if ((tile.status != Tile::Status::EMPTY) && _cores[core_id]->can_issue(tile)) {
                         if (tile.status == Tile::Status::INITIALIZED) {
                             assert(tile.stage_platform == StagePlatform::SA);
                             // EE514
                             _cores[core_id]->issue(tile);
-                            // _scheduler->get_tile1(core_id);
                             _scheduler->get_tile_SA(core_id);
                         }
                     }
@@ -188,9 +187,26 @@ void Simulator::cycle() {
                 // <<< todo: support 2 sub-batch
                 // EE514
                 // spdlog::info("core cycling {}", core_id);
-                _cores[core_id]->cycle();
+                something_finish = _cores[core_id]->cycle();
+                if(something_finish)
+                    break;
             }
             _core_cycles++;
+
+            if (something_finish) {
+                // TODO: cleanup
+                for(uint32_t i = 0; i < _n_cores; i++) {
+                    _cores[i]->cleanup_SA();
+                }
+                // cleanup scheduler
+                // _scheduler->cleanup_SA();
+                // assert(0);
+                
+                // running = running || _icnt->running(); 항상 false.
+                // running = running || _dram->running(); 항상 false.
+                // running = running || _scheduler->running();
+                // running = running || _client->running();
+            }
         }
 
         // DRAM cycle
@@ -203,7 +219,9 @@ void Simulator::cycle() {
                 for (uint32_t channel_index = 0; channel_index < _n_memories; ++channel_index) {
                     auto core_ind = core_id * _n_cores + channel_index;
                     // core -> ICNT (sub-batch #1)
+                    // spdlog::info("core_id: {}, mem_req_??: {}", core_id, _cores[core_id]->has_memory_request1(channel_index));
                     if (_cores[core_id]->has_memory_request1(channel_index)) {
+                        
                         MemoryAccess *front = _cores[core_id]->top_memory_request1(channel_index);
                         front->core_id = core_id;
                         if (!_icnt->is_full(core_ind, front)) {

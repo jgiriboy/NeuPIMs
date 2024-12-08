@@ -2,7 +2,11 @@
 
 uint32_t generate_id() {
     static uint32_t id_counter{0};
-    return id_counter++;
+    // EE514
+    // return id_counter++;
+    uint32_t ret = id_counter;
+    id_counter += 2;
+    return ret;
 }
 uint32_t generate_mem_access_id() {
     static uint32_t id_counter{0};

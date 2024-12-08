@@ -258,13 +258,14 @@ Ptr<Tile> NeuPIMSCore::pop_finished_tile() {
     return result;
 }
 
-void NeuPIMSCore::cycle() {
+bool NeuPIMSCore::cycle() {
     _core_cycle++;
     _spad.cycle();
     _acc_spad.cycle();
 
     // EE514
-    spdlog::info("current spad: {} current core: {}", _current_spad, _id);
+    bool finished = false;
+    // spdlog::info("current spad: {} current core: {}", _current_spad, _id);
     for (auto tile_it = _tiles.begin(); tile_it != _tiles.end();) {
         auto tile = *tile_it;
         spdlog::info(
@@ -276,6 +277,7 @@ void NeuPIMSCore::cycle() {
             tile->status = Tile::Status::FINISH;
             _finished_tiles.push(tile);
             tile_it = _tiles.erase(tile_it);
+            finished = true;
         } else {
             tile_it++;
         }
@@ -294,6 +296,7 @@ void NeuPIMSCore::cycle() {
         }
     }
     // xxx : need logic for _finished_pim_tiles?
+    return finished;
 }
 
 bool NeuPIMSCore::running() {
@@ -327,6 +330,16 @@ bool NeuPIMSCore::running() {
     }
 
     return running;
+}
+
+void NeuPIMSCore::cleanup_SA() {
+    _tiles.clear();
+    while(!_compute_pipeline.empty()) _compute_pipeline.pop();
+     _waiting_write_reqs = 0;
+    while(!_ld_inst_queue_for_sa.empty()) _ld_inst_queue_for_sa.pop();
+    while(!_st_inst_queue_for_sa.empty()) _st_inst_queue_for_sa.pop();
+    while(!_ex_inst_queue_for_sa.empty()) _ex_inst_queue_for_sa.pop();
+    _vector_pipelines.clear();
 }
 
 // push into target channel memory request queue

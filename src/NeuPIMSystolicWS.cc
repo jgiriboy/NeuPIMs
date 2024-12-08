@@ -10,7 +10,7 @@ void NeuPIMSystolicWS::log() {
     Logger::log(_stat, fname);
 }
 
-void NeuPIMSystolicWS::cycle() {
+bool NeuPIMSystolicWS::cycle() {
     if (_stat.back().start_cycle + 1000 < _core_cycle) {
         auto stat = NPUStat(_core_cycle);
         _stat.push_back(stat);
@@ -31,7 +31,7 @@ void NeuPIMSystolicWS::cycle() {
 
     // update stats
     update_stats();
-    NeuPIMSCore::cycle();
+    return NeuPIMSCore::cycle();
 }
 
 void NeuPIMSystolicWS::systolic_cycle() {
