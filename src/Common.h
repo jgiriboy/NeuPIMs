@@ -95,6 +95,7 @@ enum class Opcode {
 };
 
 struct Tile;
+enum class StagePlatform;
 
 struct Instruction {
     Opcode opcode;
@@ -124,12 +125,13 @@ struct Instruction {
 
     bool is_pim_inst = false;
 
+    StagePlatform stage_platform;
+
     std::weak_ptr<Tile> parent_tile;
 
     std::string repr();
 };
 
-enum class StagePlatform;
 
 struct Tile {
     enum class Status {

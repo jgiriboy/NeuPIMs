@@ -72,6 +72,7 @@ void SystolicWS::cycle() {
 
             ast(!front.src_addrs.empty());
             #ifdef TRI
+            assert(0 && "No please");
             auto accesses = MemoryAccess::from_instruction(
                 front, generate_mem_access_id(), _config.dram_req_size, MemoryAccessType::READ,
                 true, _id, _core_cycle, buffer_id,
@@ -110,8 +111,9 @@ void SystolicWS::cycle() {
             ast(!front.src_addrs.empty());
 
             #ifdef TRI
+            assert(0 && "No please");
             MemoryAccess *mem_request = TransToMemoryAccess(
-                front, _config.dram_req_size, _id, _core_cycle, buffer_id, StagePlatform::SA1);   // SASA?
+                front, _config.dram_req_size, _id, _core_cycle, buffer_id, StagePlatform::SA1);
             #else
             MemoryAccess *mem_request = TransToMemoryAccess(
                 front, _config.dram_req_size, _id, _core_cycle, buffer_id, StagePlatform::SA);
@@ -145,9 +147,10 @@ void SystolicWS::cycle() {
         if (buffer->check_hit(front.dest_addr, buffer_id) &&
             (front.opcode == Opcode::MOVOUT || front.opcode == Opcode::MOVOUT_POOL)) {
             #ifdef TRI
+            assert(0 && "No please");
             auto accesses = MemoryAccess::from_instruction(
                 front, generate_mem_access_id(), _config.dram_req_size, MemoryAccessType::WRITE,
-                true, _id, _core_cycle, buffer_id, StagePlatform::SA1);   // SASA?
+                true, _id, _core_cycle, buffer_id, StagePlatform::SA1);
             #else
             auto accesses = MemoryAccess::from_instruction(
                 front, generate_mem_access_id(), _config.dram_req_size, MemoryAccessType::WRITE,

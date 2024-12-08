@@ -83,6 +83,7 @@ bool Core::can_issue(Tile &next_tile) {
 // switch tiles to shared ptr
 // todo: check tile start cycle
 void Core::issue(Tile &in_tile) {
+    assert(0 && "Use this?");
     spdlog::info("tile issued {}", in_tile.repr());
     auto tile = std::make_shared<Tile>(in_tile);
     tile->stat = TileStat(_core_cycle);

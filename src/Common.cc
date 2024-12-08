@@ -282,7 +282,7 @@ void initialize_system_config(std::string sys_config_path) {
     Config::global_config.max_active_reqs = sys_config["max_active_reqs"];
     Config::global_config.max_batch_size = sys_config["max_batch_size"];
 
-    Config::global_config.sub_batch_mode = sys_config["sub_batch_mode"]; // [TODO] tri_batch_mode?
+    Config::global_config.sub_batch_mode = sys_config["sub_batch_mode"];
 }
 
 json load_config(std::string config_path) {

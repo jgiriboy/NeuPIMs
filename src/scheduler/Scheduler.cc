@@ -252,92 +252,96 @@ void Scheduler::make_program() {
     std::shared_ptr<BatchedRequest> sub_batch_on_sa_2;
     #endif
     #ifdef TRI
-    switch(_stage)
-    {
-        case Stage::A:
-            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);
-            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
-            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq3);
-            break;
-        case Stage::B:
-            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq3);
-            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq2);
-            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq1);
-            break;
-        case Stage::C:
-            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);
-            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq3);
-            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq1);
-            break;
-        case Stage::D:
-            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq3);
-            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
-            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
-            break;
-        case Stage::E:
-            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
-            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq3);
-            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
-            break;
-        case Stage::F:
-            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
-            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq2);
-            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq3);
-            break;
-        case Stage::G:
-            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);
-            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
-            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq3);
-            break;
-        case Stage::H:
-            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);
-            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq3);
-            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq1);
-            break;
-        case Stage::I:
-            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq3);
-            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq2);
-            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq1);
-            break;
-        case Stage::J:
-            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq3);
-            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
-            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
-            break;
-        case Stage::K:
-            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
-            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq3);
-            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
-            break;
-        case Stage::L:
-            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
-            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq2);
-            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq3);
-            break;
-        case Stage::M:
-            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);
-            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
-            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq3);
-            break;
-        case Stage::N:
-            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);
-            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq3);
-            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq1);
-            break;
-        case Stage::O:
-            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq3);
-            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq2);
-            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq1);
-            break;
-        case Stage::P:
-            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq3);
-            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
-            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
-            break;
-        default:
-            assert(0 && "Invalid stage");
-            break;
-    }
+    // switch(_stage)
+    // {
+    //     case Stage::A:
+    //         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);
+    //         sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
+    //         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq3);
+    //         break;
+    //     case Stage::B:
+    //         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq3);
+    //         sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq2);
+    //         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq1);
+    //         break;
+    //     case Stage::C:
+    //         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);
+    //         sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq3);
+    //         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq1);
+    //         break;
+    //     case Stage::D:
+    //         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq3);
+    //         sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
+    //         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
+    //         break;
+    //     case Stage::E:
+    //         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
+    //         sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq3);
+    //         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
+    //         break;
+    //     case Stage::F:
+    //         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
+    //         sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq2);
+    //         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq3);
+    //         break;
+    //     case Stage::G:
+    //         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);
+    //         sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
+    //         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq3);
+    //         break;
+    //     case Stage::H:
+    //         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);
+    //         sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq3);
+    //         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq1);
+    //         break;
+    //     case Stage::I:
+    //         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq3);
+    //         sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq2);
+    //         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq1);
+    //         break;
+    //     case Stage::J:
+    //         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq3);
+    //         sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
+    //         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
+    //         break;
+    //     case Stage::K:
+    //         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
+    //         sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq3);
+    //         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
+    //         break;
+    //     case Stage::L:
+    //         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
+    //         sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq2);
+    //         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq3);
+    //         break;
+    //     case Stage::M:
+    //         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);
+    //         sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
+    //         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq3);
+    //         break;
+    //     case Stage::N:
+    //         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);
+    //         sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq3);
+    //         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq1);
+    //         break;
+    //     case Stage::O:
+    //         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq3);
+    //         sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq2);
+    //         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq1);
+    //         break;
+    //     case Stage::P:
+    //         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq3);
+    //         sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
+    //         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
+    //         break;
+    //     default:
+    //         assert(0 && "Invalid stage");
+    //         break;
+    // }
+
+    sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
+    sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
+    sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq3);
 
     spdlog::info("New Program for SA1 (sub-batch.size: {})", sub_batch_on_sa->_reqs.size());
     spdlog::info("New Program for SA2 (sub-batch.size: {})", sub_batch_on_sa_2->_reqs.size());
@@ -353,8 +357,9 @@ void Scheduler::make_program() {
     refresh_status1();
     refresh_status2();
     refresh_status3();
+    
     #else
-
+    assert(0 && "TRI is not defined");
     if (static_cast<int>(_stage) % 2 == 0) {
         sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
         sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
@@ -576,7 +581,8 @@ void Scheduler::cycle() {
         #ifdef TRI
         bool lets_make_program3 = _model_program3 == nullptr && _breq3.size() > 0;
         #endif
-
+        // spdlog::info ("breq1: {}, breq2: {}, breq3: {}", _breq1.size() > 0, _breq2.size() > 0, _breq3.size() > 0);
+        // spdlog::info ("lets_make_program1: {}, lets_make_program2: {}, lets_make_program3: {}", _breq1.size() > 0, _breq2.size() > 0, _breq3.size() > 0);
         #ifdef TRI
         if (lets_make_program1 && lets_make_program2 && lets_make_program3) {
             if (_stage == Stage::Finish) {
@@ -861,7 +867,8 @@ bool Scheduler::empty2() { return _model_program2 == nullptr; }
 bool Scheduler::empty3() { return _model_program3 == nullptr; }
 #endif
 
-bool Scheduler::running() { return !_request_queue.empty() || !_completed_request_queue.empty(); }
+bool Scheduler::running() { 
+    return !_request_queue.empty() || !_completed_request_queue.empty(); }
 
 void Scheduler::cleanup_sub_batch(std::vector<Ptr<InferRequest>> sub_batch) {
     // < todos when the model program has finished >

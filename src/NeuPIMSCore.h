@@ -100,10 +100,18 @@ class NeuPIMSCore {
     std::vector<std::queue<Instruction>> _vector_pipelines;
 
     // SA Sub-batch queue
+    #ifdef TRI
+    std::queue<Instruction> _ld_inst_queue_for_sa1;
+    std::queue<Instruction> _ld_inst_queue_for_sa2;
+    std::queue<Instruction> _st_inst_queue_for_sa1;
+    std::queue<Instruction> _st_inst_queue_for_sa2;
+    std::queue<Instruction> _ex_inst_queue_for_sa1;
+    std::queue<Instruction> _ex_inst_queue_for_sa2;    
+    #else
     std::queue<Instruction> _ld_inst_queue_for_sa;
     std::queue<Instruction> _st_inst_queue_for_sa;
     std::queue<Instruction> _ex_inst_queue_for_sa;
-
+    #endif
     // PIM Sub-batch queue
     std::queue<Instruction> _ld_inst_queue_for_pim;
     std::queue<Instruction> _st_inst_queue_for_pim;

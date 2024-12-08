@@ -93,7 +93,7 @@ void SimpleInterconnect::cycle() {
                     // if (!_config.sub_batch_mode) {
                     //     // When single buffer PIM (Newton), there is single batch,
                     //     // so use one interconnect queue.
-                    //     mem_req->stage_platform = StagePlatform::SA1; // [TODO] review_JYK
+                    //     mem_req->stage_platform = StagePlatform::SA1; //
                     //     // Based on the assumption that our config ALWAYS support sub_batch_mode
                     // }
                     #ifdef TRI

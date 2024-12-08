@@ -113,9 +113,9 @@ void Simulator::cycle() {
     OpStat op_stat;
     ModelStat model_stat;
     uint32_t tile_count;
+    unsigned count = 0;
     while (running()) {
         int model_id = 0;
-
         set_cycle_mask();
         // Core Cycle
         if (_cycle_mask & CORE_MASK) {
@@ -142,7 +142,6 @@ void Simulator::cycle() {
                 } else if (finished_tile->status == Tile::Status::FINISH) {
                     _scheduler->finish_tile(core_id, *finished_tile);
                 }
-
                 // Issue new tile to core
                 #ifdef TRI
                 if (_scheduler->empty1() && _scheduler->empty2() && _scheduler->empty3())
@@ -153,7 +152,7 @@ void Simulator::cycle() {
                 #endif
                 // >>> todo: support 2 sub-batch
                 #ifdef TRI
-                if (!_scheduler->empty1()) {
+                if (!_scheduler->empty1()) { // 무조건 SA1
                     Tile &tile = _scheduler->top_tile1(core_id);
                     if ((tile.status != Tile::Status::EMPTY) && _cores[core_id]->can_issue(tile)) {
                         if (tile.status == Tile::Status::INITIALIZED) {
@@ -175,7 +174,7 @@ void Simulator::cycle() {
                     }
                 }
                 #endif
-                if (!_scheduler->empty2()) {
+                if (!_scheduler->empty2()) { // 무조건 PIM
                     Tile &tile = _scheduler->top_tile2(core_id);
                     if ((tile.status != Tile::Status::EMPTY) && _cores[core_id]->can_issue_pim()) {
                         if (tile.status == Tile::Status::INITIALIZED) {
@@ -186,7 +185,7 @@ void Simulator::cycle() {
                     }
                 }
                 #ifdef TRI
-                if (!_scheduler->empty3()) {
+                if (!_scheduler->empty3()) { // 무조건 SA2
                     Tile &tile = _scheduler->top_tile3(core_id);
                     if ((tile.status != Tile::Status::EMPTY) && _cores[core_id]->can_issue(tile)) {
                         if (tile.status == Tile::Status::INITIALIZED) {
@@ -269,6 +268,8 @@ void Simulator::cycle() {
 
             _icnt->cycle();
         }
+        count++;
+        // if(count == 50) break;
     }
     spdlog::info("Simulation Finished");
     /* Print simulation stats */
@@ -290,6 +291,7 @@ bool Simulator::running() {
 
     for (auto &core : _cores) {
         running = running || core->running();
+        // spdlog::info("core running: {}", core->running());
     }
     running = running || _icnt->running();
     running = running || _dram->running();
@@ -297,11 +299,6 @@ bool Simulator::running() {
     running = running || _client->running();
     // if (!_client->running() && _cores[0]->running()) {
     //     // for debug
-    //     spdlog::info("core[1] running: {}", _cores[0]->running());
-    //     spdlog::info("icnt running: {}", _icnt->running());
-    //     spdlog::info("dram running: {}", _dram->running());
-    //     spdlog::info("scheduler running: {}", _scheduler->running());
-    //     spdlog::info("client running: {}", _client->running());
     //     exit(-1);
     // }
 

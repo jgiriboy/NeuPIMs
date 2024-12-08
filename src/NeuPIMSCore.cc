@@ -113,10 +113,13 @@ void NeuPIMSCore::issue(Tile &in_tile) {
     tile->remaining_loads = 0;
     tile->remaining_computes = 0;
     tile->remaining_accum_io = 0;
+    spdlog::info("[EE514] instuructions in tile: {}", tile->instructions.size());
     for (auto &inst : tile->instructions) {
         inst.parent_tile = std::weak_ptr<Tile>(tile);
         inst.spad_id = tile->spad_id;
         inst.accum_spad_id = tile->accum_spad_id;
+        assert(tile->stage_platform == StagePlatform::SA1 || tile->stage_platform == StagePlatform::SA2);
+        inst.stage_platform = tile->stage_platform;
         Sram *buffer;
         int buffer_id;
         if (inst.dest_addr >= ACCUM_SPAD_BASE) {
@@ -128,7 +131,7 @@ void NeuPIMSCore::issue(Tile &in_tile) {
         }
         if (inst.opcode == Opcode::PIM_HEADER) {
             assert(0);
-            _ld_inst_queue_for_sa.push(inst);
+            // _ld_inst_queue_for_sa.push(inst);
         } else if (inst.opcode == Opcode::MOVIN || inst.opcode == Opcode::PIM_GWRITE ||
                    inst.opcode == Opcode::PIM_COMP || inst.opcode == Opcode::PIM_READRES ||
                    inst.opcode == Opcode::PIM_COMPS_READRES) {
@@ -143,7 +146,16 @@ void NeuPIMSCore::issue(Tile &in_tile) {
             if (!buffer->check_allocated(inst.dest_addr, buffer_id) &&
                 buffer->check_remain(inst.size, buffer_id)) {
                 tile->remaining_loads++;
+                #ifdef TRI
+                if (inst.stage_platform == StagePlatform::SA1) {
+                    _ld_inst_queue_for_sa1.push(inst);
+                } else {
+                    assert(inst.stage_platform == StagePlatform::SA2);
+                    _ld_inst_queue_for_sa2.push(inst);
+                }
+                #else
                 _ld_inst_queue_for_sa.push(inst);
+                #endif
             } else {
                 spdlog::info("sram size: {} / sram used: {}", _config.core_config[_id].sram_size KB / 2,
                              buffer->get_current_size(buffer_id));
@@ -155,12 +167,30 @@ void NeuPIMSCore::issue(Tile &in_tile) {
             }
         } else if (inst.opcode == Opcode::MOVOUT || inst.opcode == Opcode::MOVOUT_POOL) {
             tile->remaining_accum_io++;
+            #ifdef TRI
+            if(inst.stage_platform == StagePlatform::SA1) {
+                _st_inst_queue_for_sa1.push(inst);
+            } else {
+                assert(inst.stage_platform == StagePlatform::SA2);
+                _st_inst_queue_for_sa2.push(inst);
+            }
+            #else
             _st_inst_queue_for_sa.push(inst);
+            #endif
         } else {
             /* Ex inst queue */
             tile->remaining_accum_io++;
             tile->remaining_computes++;
+            #ifdef TRI
+            if(inst.stage_platform == StagePlatform::SA1) {
+                _ex_inst_queue_for_sa1.push(inst);
+            } else {
+                assert(inst.stage_platform == StagePlatform::SA2);
+                _ex_inst_queue_for_sa2.push(inst);
+            }
+            #else
             _ex_inst_queue_for_sa.push(inst);
+            #endif
         }
     }
     // spdlog::info("tile pushed to core._tiles {}", tile.repr());
@@ -194,6 +224,8 @@ void NeuPIMSCore::issue_pim(Tile &in_tile) {
         inst.is_pim_inst = true;
         inst.parent_tile = std::weak_ptr<Tile>(tile);
         inst.spad_id = tile->spad_id;
+        assert(tile->stage_platform == StagePlatform::PIM);
+        inst.stage_platform = tile->stage_platform;
         inst.accum_spad_id = tile->accum_spad_id;
         Sram *buffer;
         int buffer_id;
@@ -244,7 +276,6 @@ Ptr<Tile> NeuPIMSCore::pop_finished_tile() {
     if (_finished_tiles.empty()) {
         return nullptr;
     }
-
     auto result = _finished_tiles.front();
     result->stat.end_cycle = _core_cycle;
     _finished_tiles.pop();
@@ -257,12 +288,13 @@ void NeuPIMSCore::cycle() {
     _acc_spad.cycle();
 
     // spdlog::info("current spad {}", _current_spad);
+    //spdlog::info("[EE514] current spad: {} current core: {}", _current_spad, _id);
     for (auto tile_it = _tiles.begin(); tile_it != _tiles.end();) {
         auto tile = *tile_it;
-        // spdlog::info(
-        //     "tile index: {}, tile remain_accum_io: {}, remain_computes: {}, remain_loads: {}",
-        //     tile_it - _tiles.begin(), tile->remaining_accum_io, tile->remaining_computes,
-        //     tile->remaining_loads);
+        spdlog::info(
+            "[EE514] tile index: {}, tile remain_accum_io: {}, remain_computes: {}, remain_loads: {}",
+            tile_it - _tiles.begin(), tile->remaining_accum_io, tile->remaining_computes,
+            tile->remaining_loads);
         if ((tile->remaining_accum_io == 0) && (tile->remaining_computes == 0) &&
             (tile->remaining_loads == 0)) {
             tile->status = Tile::Status::FINISH;
@@ -293,9 +325,18 @@ bool NeuPIMSCore::running() {
     running = running || _tiles.size() > 0;
     running = running || !_compute_pipeline.empty();
     running = running || _waiting_write_reqs != 0;
+    #ifdef TRI
+    running = running || !_ld_inst_queue_for_sa1.empty();
+    running = running || !_st_inst_queue_for_sa1.empty();
+    running = running || !_ex_inst_queue_for_sa1.empty();
+    running = running || !_ld_inst_queue_for_sa2.empty();
+    running = running || !_st_inst_queue_for_sa2.empty();
+    running = running || !_ex_inst_queue_for_sa2.empty();
+    #else
     running = running || !_ld_inst_queue_for_sa.empty();
     running = running || !_st_inst_queue_for_sa.empty();
     running = running || !_ex_inst_queue_for_sa.empty();
+    #endif
     bool temp = running;
     for (auto &vector_pipeline : _vector_pipelines) {
         running = running || !vector_pipeline.empty();
@@ -308,10 +349,19 @@ bool NeuPIMSCore::running() {
         spdlog::info("pim_tiles: {}", _pim_tiles.size() > 0);
         spdlog::info("_compute_pipeline: {}", !_compute_pipeline.empty());
         spdlog::info("_waiting_write_reqs: {}", _waiting_write_reqs != 0);
+        #ifdef TRI
+        spdlog::info("_ld_inst_queue_for_sa1: {}", !_ld_inst_queue_for_sa1.empty());
+        spdlog::info("_st_inst_queue_for_sa1: {}", !_st_inst_queue_for_sa1.empty());
+        spdlog::info("_ex_inst_queue_for_sa1: {}", !_ex_inst_queue_for_sa1.empty());
+        spdlog::info("_ld_inst_queue_for_sa2: {}", !_ld_inst_queue_for_sa2.empty());
+        spdlog::info("_st_inst_queue_for_sa2: {}", !_st_inst_queue_for_sa2.empty());
+        spdlog::info("_ex_inst_queue_for_sa2: {}", !_ex_inst_queue_for_sa2.empty());
+        #else
         spdlog::info("_ld_inst_queue_for_sa: {}", !_ld_inst_queue_for_sa.empty());
         spdlog::info("_st_inst_queue_for_sa: {}", !_st_inst_queue_for_sa.empty());
         spdlog::info("_ex_inst_queue_for_sa: {}", !_ex_inst_queue_for_sa.empty());
         spdlog::info("due to vector: {}", running);
+        #endif
         for (auto &vector_pipeline : _vector_pipelines) {
             spdlog::info("vp size: {}", vector_pipeline.size());
         }
@@ -333,6 +383,7 @@ void NeuPIMSCore::push_memory_request2(MemoryAccess *request) {
 }
 
 void NeuPIMSCore::push_memory_response(MemoryAccess *response) {
+    assert(0 && "You don't?");
     assert(!response->request);  // can only push response
 
     Sram *acc_spad = &_acc_spad;
@@ -347,6 +398,7 @@ void NeuPIMSCore::push_memory_response(MemoryAccess *response) {
 
     bool is_write = response->req_type == MemoryAccessType::WRITE;
     bool is_read = response->req_type == MemoryAccessType::READ;
+    spdlog::info("<EE514> req_type: {}", static_cast<int>(response->req_type));
     if (auto tile = response->parent_tile.lock()) {
         if (is_write) {
             tile->remaining_accum_io--;
@@ -380,6 +432,7 @@ void NeuPIMSCore::push_memory_response(MemoryAccess *response) {
 
 // -- seems it is not used.
 void NeuPIMSCore::pim_push_memory_response(MemoryAccess *response) {
+    assert(0 && "No use?");
     assert(!response->request);  // can only push response
 
     bool is_write = response->req_type == MemoryAccessType::WRITE;
