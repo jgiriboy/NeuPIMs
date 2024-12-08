@@ -255,9 +255,29 @@ void Scheduler::make_program() {
     switch(_stage)
     {
         case Stage::A:
-            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);   // exception
+            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);
             sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
-            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq3);  // exception
+            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq3);
+            break;
+        case Stage::B:
+            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq3);
+            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq2);
+            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq1);
+            break;
+        case Stage::C:
+            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);
+            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq3);
+            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq1);
+            break;
+        case Stage::D:
+            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq3);
+            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
+            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
+            break;
+        case Stage::E:
+            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
+            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq3);
+            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
             break;
         case Stage::F:
             sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
@@ -287,6 +307,31 @@ void Scheduler::make_program() {
         case Stage::K:
             sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
             sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq3);
+            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
+            break;
+        case Stage::L:
+            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq1);
+            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq2);
+            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq3);
+            break;
+        case Stage::M:
+            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);
+            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
+            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq3);
+            break;
+        case Stage::N:
+            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq2);
+            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq3);
+            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq1);
+            break;
+        case Stage::O:
+            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq3);
+            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq2);
+            sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq1);
+            break;
+        case Stage::P:
+            sub_batch_on_sa = std::make_shared<BatchedRequest>(_breq3);
+            sub_batch_on_sa_2 = std::make_shared<BatchedRequest>(_breq1);
             sub_batch_on_pim = std::make_shared<BatchedRequest>(_breq2);
             break;
         default:
